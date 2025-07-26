@@ -62,7 +62,7 @@ const REQUEST_PERIOD = 60 * 1000; // 1 minute in milliseconds
 const apiRequestTracker = {
   requests: [] as number[],
   isRateLimited: false,
-  rateLimitTimeout: null as NodeJS.Timeout | null,
+  rateLimitTimeout: null as ReturnType<typeof setTimeout> | null,
   
   // Record a new request timestamp
   recordRequest() {
