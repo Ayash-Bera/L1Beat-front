@@ -83,7 +83,7 @@ export async function getBlogPosts(
             params.append('tag', tag);
         }
 
-        const response = await fetch(`${config.apiBaseUrl}/blog/posts?${params}`, {
+        const response = await fetch(`${config.apiBaseUrl}/api/blog/posts?${params}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -103,7 +103,7 @@ export async function getBlogPosts(
 
 export async function getBlogPost(slug: string): Promise<BlogPostResponse> {
     try {
-        const response = await fetch(`${config.apiBaseUrl}/blog/posts/${slug}`, {
+        const response = await fetch(`${config.apiBaseUrl}/api/blog/posts/${slug}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -126,7 +126,7 @@ export async function getBlogPost(slug: string): Promise<BlogPostResponse> {
 
 export async function getBlogHealth(): Promise<BlogHealthResponse> {
     try {
-        const response = await fetch(`${config.apiBaseUrl}/blog/health`, {
+        const response = await fetch(`${config.apiBaseUrl}/api/blog/health`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -146,7 +146,7 @@ export async function getBlogHealth(): Promise<BlogHealthResponse> {
 
 export async function getBlogTags(): Promise<BlogTagsResponse> {
     try {
-        const response = await fetch(`${config.apiBaseUrl}/blog/tags`, {
+        const response = await fetch(`${config.apiBaseUrl}/api/blog/tags`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',

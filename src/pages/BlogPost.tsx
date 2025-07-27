@@ -107,7 +107,7 @@ export function BlogPost() {
                 </div>
             );
         }
-    };
+    }; 
 
     if (loading) {
         return (
@@ -205,12 +205,11 @@ export function BlogPost() {
                         )}
 
                         {/* Title */}
-                        <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6 leading-tight">
+                        <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-6 leading-tight">
                             {post.title}
                         </h1>
 
-                        {/* Subtitle - NEW */}
-                        {post.subtitle && (
+                        {post.subtitle && post.subtitle.trim() && (
                             <h2 className="text-xl md:text-2xl font-medium text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">
                                 {post.subtitle}
                             </h2>
@@ -277,9 +276,12 @@ export function BlogPost() {
                         </div>
                     )}
 
-                    {/* Main Content - IMPROVED */}
+                    {/* Main Content - Use mainContent preferentially to avoid subtitle duplication */}
                     <div className="mb-12">
-                        {renderMainContent(post.mainContent || post.content)}
+                        {renderMainContent(
+                            // Prefer mainContent (which should exclude subtitle) over content
+                            post.mainContent || post.content
+                        )}
                     </div>
 
                     {/* Footer */}
