@@ -22,3 +22,7 @@ dist-ssr
 *.sw?
 
 .env
+
+# Generated ACP data
+public/acps/processed-acps.json
+public/acps/ACPs/index.json

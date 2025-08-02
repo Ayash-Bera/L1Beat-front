@@ -125,3 +125,88 @@ export interface Author {
   name: string;
   github: string;
 }
+export interface ACP {
+  number: string;
+  title: string;
+  authors: { name: string; github: string }[];
+  status: string;
+  track: string;
+  content: string;
+  discussion?: string;
+}
+
+// Enhanced ACP interface with additional metadata
+export interface EnhancedACP extends ACP {
+  complexity?: string;
+  tags?: string[];
+  readingTime?: number;
+  abstract?: string;
+  dependencies?: string[];
+  replaces?: string[];
+  supersededBy?: string[];
+  folderName?: string;
+}
+
+// Statistics interface for ACP analytics
+export interface ACPStats {
+  total: number;
+  byStatus: Record<string, number>;
+  byTrack: Record<string, number>;
+  byComplexity: Record<string, number>;
+}
+
+// Filter and UI state types
+export type ViewMode = 'grid' | 'list';
+export type SortOption = 'number' | 'title' | 'status' | 'track' | 'complexity';
+export type SortOrder = 'asc' | 'desc';
+
+export interface ACPFilters {
+  status: string;
+  track: string;
+  complexity: string;
+  author: string;
+  hasDiscussion: boolean | null;
+}
+
+// Utility functions for ACP management
+export interface ACPSearchOptions {
+  query: string;
+  filters: Partial<ACPFilters>;
+  sortBy: SortOption;
+  sortOrder: SortOrder;
+}
+
+// ACP relationship types
+export interface ACPRelationship {
+  type: 'depends' | 'replaces' | 'superseded-by';
+  acpNumber: string;
+  title?: string;
+}
+
+// ACP author with validation
+export interface ACPAuthor {
+  name: string;
+  github: string;
+  isValidGithub?: boolean;
+}
+
+// Enhanced ACP with computed properties
+export interface ProcessedACP extends EnhancedACP {
+  searchableText: string;
+  relationships: ACPRelationship[];
+  validatedAuthors: ACPAuthor[];
+}
+
+// API response interfaces
+export interface ACPListResponse {
+  acps: EnhancedACP[];
+  stats: ACPStats;
+  total: number;
+}
+
+export interface ACPSearchResponse {
+  acps: EnhancedACP[];
+  total: number;
+  query: string;
+  filters: ACPFilters;
+}
