@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import ContentRenderer from '../components/ContentRenderer';
+import parse from 'html-react-parser';
 import {
     ArrowLeft,
     Calendar,
@@ -73,41 +75,57 @@ export function BlogPost() {
                 break;
         }
     };
+    const SubstackSubscribeWidget = () => (
+    <div className="mt-16 mb-8 bg-gray-50 dark:bg-dark-900 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+        <div className="bg-white dark:bg-dark-800 p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="text-center">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                    Stay Updated with L1Beat
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Get insights on Avalanche L1 ecosystem analytics
+                </p>
+            </div>
+        </div>
+        
+        <div className="p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm">
+                <iframe 
+                    src="https://l1beat.substack.com/embed" 
+                    width="100%" 
+                    height="280" 
+                    className="w-full border-0"
+                    frameBorder="0" 
+                    scrolling="no"
+                    title="Subscribe to L1Beat newsletter"
+                    style={{ filter: 'brightness(0.95)' }}
+                />
+            </div>
+        </div>
+    </div>
+);
 
-    const renderMainContent = (content: string | undefined) => {
-        if (!content) return null;
+const renderMainContent = (content: string | undefined) => {
+    if (!content) return null;
 
+    try {
+        // Parse the JSON content blocks from backend
+        const blocks = JSON.parse(content);
+        return <ContentRenderer blocks={blocks} />;
+    } catch (error) {
+        // Fallback for non-JSON content (legacy posts)
         const cleanContent = content.trim();
         if (!cleanContent) return null;
 
-        // Check if content is HTML
-        const isHTML = /<[^>]*>/g.test(cleanContent);
+        // Convert legacy HTML to simple blocks
+        const legacyBlocks = [{
+            type: 'paragraph',
+            content: cleanContent
+        }];
 
-        if (isHTML) {
-            return (
-                <div
-                    className="prose prose-lg max-w-none dark:prose-invert prose-p:leading-relaxed prose-p:mb-6 prose-headings:mt-8 prose-headings:mb-4"
-                    dangerouslySetInnerHTML={{ __html: cleanContent }}
-                />
-            );
-        } else {
-            // Split by double newlines for paragraphs
-            const paragraphs = cleanContent
-                .split(/\n\s*\n/)
-                .map(p => p.trim())
-                .filter(p => p.length > 0);
-
-            return (
-                <div className="prose prose-lg max-w-none dark:prose-invert">
-                    {paragraphs.map((paragraph, index) => (
-                        <p key={index} className="mb-6 leading-relaxed text-gray-700 dark:text-gray-300">
-                            {paragraph}
-                        </p>
-                    ))}
-                </div>
-            );
-        }
-    }; 
+        return <ContentRenderer blocks={legacyBlocks} />;
+    }
+};
 
     if (loading) {
         return (
@@ -282,6 +300,8 @@ export function BlogPost() {
                             // Prefer mainContent (which should exclude subtitle) over content
                             post.mainContent || post.content
                         )}
+                        {/* Subscribe Widget */}
+                        <SubstackSubscribeWidget />
                     </div>
 
                     {/* Footer */}

@@ -2,7 +2,6 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StatusBar } from '../components/StatusBar';
 import { Footer } from '../components/Footer';
-import { ThemeToggle } from '../components/ThemeToggle';
 import {
   FileText,
   ExternalLink,
@@ -360,7 +359,6 @@ npm run build:acps`}
                 Browse and explore all ACPs in the Avalanche ecosystem.
               </p>
             </div>
-            <ThemeToggle />
           </div>
 
           {/* Statistics Cards */}

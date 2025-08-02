@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { StatusBar } from '../components/StatusBar';
 import { Footer } from '../components/Footer';
-import { ThemeToggle } from '../components/ThemeToggle';
 import {
   ArrowLeft,
   ExternalLink,
@@ -181,7 +180,6 @@ export default function ACPDetails() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to ACPs
             </button>
-            <ThemeToggle />
           </div>
 
           {/* ACP Header */}
