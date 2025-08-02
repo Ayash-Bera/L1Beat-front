@@ -69,7 +69,8 @@ class ACPBuilder {
             this.acps.push(acp);
             console.log(`✅ Processed ACP-${acp.number}: ${acp.title}`);
           }
-        } catch (error) {
+        }
+ catch (error) {
           console.warn(`⚠️  Failed to process ${folderName}:`, error.message);
         }
       }
@@ -99,7 +100,8 @@ class ACPBuilder {
       fs.writeFileSync(indexFile, JSON.stringify(indexData, null, 2));
 
       console.log("🎉 Build completed successfully!");
-    } catch (error) {
+    }
+ catch (error) {
       console.error("❌ Build failed:", error);
       process.exit(1);
     }
@@ -179,14 +181,18 @@ class ACPBuilder {
         if (inTable && line.startsWith("|")) {
           if (line.includes("| **Title** |")) {
             title = this.extractTableValue(line, "Title");
-          } else if (line.includes("| **Authors** |")) {
+          }
+ else if (line.includes("| **Author(s)** |") || line.includes("| **Authors** |")) {
             const authorsStr = this.extractTableValue(line, "Authors");
             authors = this.parseAuthors(authorsStr);
-          } else if (line.includes("| **Status** |")) {
+          }
+ else if (line.includes("| **Status** |")) {
             status = this.extractTableValue(line, "Status");
-          } else if (line.includes("| **Track** |")) {
+          }
+ else if (line.includes("| **Track** |")) {
             track = this.extractTableValue(line, "Track");
-          } else if (
+          }
+ else if (
             line.includes("| **Discussions** |") ||
             line.includes("| **Discussion** |")
           ) {
@@ -222,7 +228,8 @@ class ACPBuilder {
         tags: tags,
         readingTime: Math.max(1, Math.ceil(markdown.length / 1000)),
       };
-    } catch (error) {
+    }
+ catch (error) {
       console.warn(`Failed to parse ACP-${acpNumber}:`, error.message);
       return null;
     }
@@ -233,7 +240,7 @@ class ACPBuilder {
     const parts = line.split("|").map((p) => p.trim());
     if (parts.length >= 3) {
       const field = parts[1].replace(/\*\*/g, "").trim();
-      if (field.toLowerCase().includes(fieldName.toLowerCase())) {
+      if (field.toLowerCase().startsWith(fieldName.toLowerCase().substring(0,5))) {
         return parts[2].replace(/\*\*/g, "").trim();
       }
     }
@@ -243,41 +250,33 @@ class ACPBuilder {
   parseAuthors(authorsStr) {
     if (!authorsStr) return [];
 
-    // Handle different author formats
     const authors = [];
-    const authorParts = authorsStr.split(",").map((a) => a.trim());
+    const authorParts = authorsStr.split(/,\s*(?![^\[\]]*\])/g).map((a) => a.trim());
 
     for (const authorPart of authorParts) {
-      // Match formats like "Name (@github)" or "[Name](mailto:email)" or just "Name"
       const githubMatch = authorPart.match(/(.+?)\s*\(@(.+?)\)/);
-      const emailMatch = authorPart.match(/\[(.+?)\]\(mailto:(.+?)\)/);
+      const linkMatch = authorPart.match(/\[(.+?)\]\((.+?)\)/);
 
       if (githubMatch) {
         authors.push({
           name: githubMatch[1].trim(),
           github: githubMatch[2].trim(),
         });
-      } else if (emailMatch) {
-        authors.push({
-          name: emailMatch[1].trim(),
-          github: "", // Could add email field if needed
-        });
-      } else {
-        // Clean up markdown links and just get the name
-        const cleanName = authorPart
-          .replace(/[\[\]()]/g, "")
-          .split("@")[0]
-          .trim();
-        if (cleanName) {
-          authors.push({
-            name: cleanName,
-            github: "",
-          });
+      }
+ else if (linkMatch) {
+        const name = linkMatch[1].trim();
+        const link = linkMatch[2].trim();
+        let github = "";
+        if (link.includes("github.com")) {
+          github = link.split("/").pop() || "";
         }
+        authors.push({ name, github });
+      }
+ else {
+        authors.push({ name: authorPart, github: "" });
       }
     }
-
-    return authors.length > 0 ? authors : [{ name: authorsStr, github: "" }];
+    return authors;
   }
 
   extractDiscussionUrl(discussionStr) {
