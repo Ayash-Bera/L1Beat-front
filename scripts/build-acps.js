@@ -57,75 +57,72 @@ class ACPBuilder {
         console.warn(
           "⚠️  No ACP folders found. Check if submodule is properly initialized."
         );
+        console.log("Try running: git submodule update --init --recursive");
         process.exit(1);
       }
 
-      // Process each folder
+      // Process each ACP folder
       for (const folderName of folders) {
-        const acp = await this.processACPFolder(folderName);
-        if (acp) {
-          this.acps.push(acp);
+        try {
+          const acp = await this.processACPFolder(folderName);
+          if (acp) {
+            this.acps.push(acp);
+            console.log(`✅ Processed ACP-${acp.number}: ${acp.title}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️  Failed to process ${folderName}:`, error.message);
         }
       }
-
-      // Sort by number (newest first)
-      this.acps.sort((a, b) => Number(b.number) - Number(a.number));
 
       // Calculate statistics
       this.calculateStats();
 
-      // Generate output
+      // Write processed data
       const output = {
         acps: this.acps,
         stats: this.stats,
-        generatedAt: new Date().toISOString(),
-        version: "1.0.0",
+        lastUpdated: new Date().toISOString(),
+        totalProcessed: this.acps.length,
       };
 
-      // Write to file
       fs.writeFileSync(OUTPUT_FILE, JSON.stringify(output, null, 2));
-
-      // Also create an index file for development fallback
-      this.createIndex(folders);
-
       console.log(`✅ Successfully processed ${this.acps.length} ACPs`);
-      console.log(`📊 Statistics:`);
-      console.log(`   - Total: ${this.stats.total}`);
-      console.log(`   - By Status:`, this.stats.byStatus);
-      console.log(`   - By Track:`, this.stats.byTrack);
-      console.log(`   - By Complexity:`, this.stats.byComplexity);
-      console.log(`💾 Output written to: ${OUTPUT_FILE}`);
+      console.log(`📄 Data written to: ${OUTPUT_FILE}`);
+
+      // Create index file for easier access
+      const indexFile = path.join(OUTPUT_DIR, "index.json");
+      const indexData = {
+        folders: folders,
+        totalACPs: this.acps.length,
+        lastUpdated: new Date().toISOString(),
+      };
+      fs.writeFileSync(indexFile, JSON.stringify(indexData, null, 2));
+
+      console.log("🎉 Build completed successfully!");
     } catch (error) {
-      console.error("❌ Error building ACP data:", error);
+      console.error("❌ Build failed:", error);
       process.exit(1);
     }
   }
 
   async processACPFolder(folderName) {
+    const folderPath = path.join(ACPS_DIR, folderName);
+    const readmePath = path.join(folderPath, "README.md");
+
+    if (!fs.existsSync(readmePath)) {
+      throw new Error(`README.md not found in ${folderName}`);
+    }
+
+    // Extract ACP number from folder name
     const match = folderName.match(/^(\d+)-/);
-    if (!match) return null;
+    if (!match) {
+      throw new Error(`Invalid folder name format: ${folderName}`);
+    }
 
     const number = match[1];
-    const readmePath = path.join(ACPS_DIR, folderName, "README.md");
+    const content = fs.readFileSync(readmePath, "utf-8");
 
-    try {
-      if (!fs.existsSync(readmePath)) {
-        console.warn(`⚠️  No README.md found for ACP-${number}`);
-        return null;
-      }
-
-      const content = fs.readFileSync(readmePath, "utf-8");
-      const acp = this.parseACPMarkdown(content, number, folderName);
-
-      if (acp) {
-        console.log(`✓ Processed ACP-${number}: ${acp.title}`);
-      }
-
-      return acp;
-    } catch (error) {
-      console.error(`❌ Error processing ACP-${number}:`, error.message);
-      return null;
-    }
+    return this.parseACPMarkdown(content, number, folderName);
   }
 
   parseACPMarkdown(markdown, acpNumber, folderName) {
@@ -137,219 +134,275 @@ class ACPBuilder {
       let track = "";
       let discussion = "";
       let inTable = false;
-
-      // Enhanced parsing for dependencies and relationships
-      let dependencies = [];
-      let replaces = [];
-      let supersededBy = [];
-
-      // Extract abstract (first paragraph after table)
       let abstract = "";
       let afterTable = false;
 
+      // Parse the ACP metadata table and content
       for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+        const line = lines[i].trim();
 
-        if (!line.trim()) continue;
+        if (!line) continue;
 
-        if (line.startsWith("| ACP |")) {
+        // Detect table start
+        if (line.startsWith("| ACP |") || line.includes("| **ACP** |")) {
           inTable = true;
           continue;
         }
 
-        if (inTable && line.startsWith("##")) {
+        // Detect table end (next heading)
+        if (inTable && line.startsWith("#")) {
           afterTable = true;
           inTable = false;
+
+          // Extract abstract from first meaningful paragraph after table
+          if (!abstract && line.startsWith("## Abstract")) {
+            let j = i + 1;
+            while (j < lines.length) {
+              const abstractLine = lines[j].trim();
+              if (!abstractLine) {
+                j++;
+                continue;
+              }
+              if (abstractLine.startsWith("#")) break;
+              if (abstractLine.length > 50) {
+                abstract = abstractLine.substring(0, 200);
+                if (abstract.length === 200) abstract += "...";
+                break;
+              }
+              j++;
+            }
+          }
           continue;
         }
 
-        if (inTable) {
+        // Parse table rows
+        if (inTable && line.startsWith("|")) {
           if (line.includes("| **Title** |")) {
-            title = line.split("|")[2].trim();
-          } else if (line.includes("| **Author(s)** |")) {
-            const authorText = line.split("|")[2];
-            authors = this.parseAuthors(authorText);
+            title = this.extractTableValue(line, "Title");
+          } else if (line.includes("| **Authors** |")) {
+            const authorsStr = this.extractTableValue(line, "Authors");
+            authors = this.parseAuthors(authorsStr);
           } else if (line.includes("| **Status** |")) {
-            const statusText = line.split("|")[2];
-            status = this.parseStatus(statusText);
-            discussion = this.parseDiscussionLink(statusText);
+            status = this.extractTableValue(line, "Status");
           } else if (line.includes("| **Track** |")) {
-            track = line.split("|")[2].trim();
+            track = this.extractTableValue(line, "Track");
           } else if (
-            line.includes("| **Depends** |") ||
-            line.includes("| **Dependencies** |")
+            line.includes("| **Discussions** |") ||
+            line.includes("| **Discussion** |")
           ) {
-            dependencies = this.parseRelationships(line.split("|")[2]);
-          } else if (line.includes("| **Replaces** |")) {
-            replaces = this.parseRelationships(line.split("|")[2]);
-          } else if (line.includes("| **Superseded-By** |")) {
-            supersededBy = this.parseRelationships(line.split("|")[2]);
-          }
-        }
-
-        // Get abstract from first substantial paragraph after table
-        if (
-          afterTable &&
-          !abstract &&
-          line.trim() &&
-          !line.startsWith("#") &&
-          !line.startsWith("|")
-        ) {
-          abstract = line.trim();
-          if (abstract.length > 200) {
-            abstract = abstract.substring(0, 200) + "...";
+            const discussionStr = this.extractTableValue(line, "Discussion");
+            discussion = this.extractDiscussionUrl(discussionStr);
           }
         }
       }
 
-      // Calculate reading time (rough estimate)
-      const wordCount = markdown.split(/\s+/).length;
-      const readingTime = Math.ceil(wordCount / 200); // 200 words per minute
+      // If no abstract found in Abstract section, try to find first meaningful paragraph
+      if (!abstract) {
+        abstract = this.extractAbstractFromContent(markdown);
+      }
 
-      // Extract potential tags from title and content
-      const tags = this.extractTags(title, markdown);
+      // Calculate complexity based on content length and keywords
+      const complexity = this.calculateComplexity(markdown);
 
-      // Determine complexity based on content
-      const complexity = this.determineComplexity(markdown);
+      // Extract tags from content
+      const tags = this.extractTags(markdown, title);
 
       return {
         number: acpNumber,
-        title,
-        authors,
-        status,
-        track,
+        title: title || `ACP-${acpNumber}`,
+        authors:
+          authors.length > 0 ? authors : [{ name: "Unknown", github: "" }],
+        status: status || "Unknown",
+        track: track || "Unknown",
+        discussion: discussion || "",
         content: markdown,
-        discussion,
-        abstract,
-        readingTime,
-        tags,
-        complexity,
-        dependencies,
-        replaces,
-        supersededBy,
-        folderName,
+        folderName: folderName,
+        abstract: abstract || "No abstract available.",
+        complexity: complexity,
+        tags: tags,
+        readingTime: Math.max(1, Math.ceil(markdown.length / 1000)),
       };
-    } catch (err) {
-      console.error(`Error parsing ACP-${acpNumber}:`, err);
+    } catch (error) {
+      console.warn(`Failed to parse ACP-${acpNumber}:`, error.message);
       return null;
     }
   }
 
-  parseAuthors(text) {
-    const authors = [];
-    const matches = text.match(/([^(@\n]+)(?:\s*\([@]([^)]+)\))?/g);
+  extractTableValue(line, fieldName) {
+    // Extract value from table row like "| **Field** | Value |"
+    const parts = line.split("|").map((p) => p.trim());
+    if (parts.length >= 3) {
+      const field = parts[1].replace(/\*\*/g, "").trim();
+      if (field.toLowerCase().includes(fieldName.toLowerCase())) {
+        return parts[2].replace(/\*\*/g, "").trim();
+      }
+    }
+    return "";
+  }
 
-    if (matches) {
-      matches.forEach((match) => {
-        const [_, name, github] =
-          match.match(/([^(@\n]+)(?:\s*\([@]([^)]+)\))?/) || [];
-        if (name) {
+  parseAuthors(authorsStr) {
+    if (!authorsStr) return [];
+
+    // Handle different author formats
+    const authors = [];
+    const authorParts = authorsStr.split(",").map((a) => a.trim());
+
+    for (const authorPart of authorParts) {
+      // Match formats like "Name (@github)" or "[Name](mailto:email)" or just "Name"
+      const githubMatch = authorPart.match(/(.+?)\s*\(@(.+?)\)/);
+      const emailMatch = authorPart.match(/\[(.+?)\]\(mailto:(.+?)\)/);
+
+      if (githubMatch) {
+        authors.push({
+          name: githubMatch[1].trim(),
+          github: githubMatch[2].trim(),
+        });
+      } else if (emailMatch) {
+        authors.push({
+          name: emailMatch[1].trim(),
+          github: "", // Could add email field if needed
+        });
+      } else {
+        // Clean up markdown links and just get the name
+        const cleanName = authorPart
+          .replace(/[\[\]()]/g, "")
+          .split("@")[0]
+          .trim();
+        if (cleanName) {
           authors.push({
-            name: name.trim(),
-            github: github?.trim() || name.trim(),
+            name: cleanName,
+            github: "",
           });
         }
-      });
+      }
     }
 
-    return authors;
+    return authors.length > 0 ? authors : [{ name: authorsStr, github: "" }];
   }
 
-  parseStatus(text) {
-    const statusMatch = text.match(/\[([^\]]+)\]|\b(\w+)\b/);
-    return (statusMatch?.[1] || statusMatch?.[2] || "Unknown").trim();
-  }
+  extractDiscussionUrl(discussionStr) {
+    if (!discussionStr) return "";
 
-  parseDiscussionLink(text) {
-    const match = text.match(/\[Discussion\]\(([^)]+)\)/);
-    return match ? match[1] : undefined;
-  }
-
-  parseRelationships(text) {
-    const relationships = [];
-    const matches = text.match(/ACP-(\d+)/g);
-    if (matches) {
-      matches.forEach((match) => {
-        const number = match.replace("ACP-", "");
-        if (number) relationships.push(number);
-      });
+    // Extract URL from markdown link [text](url)
+    const urlMatch = discussionStr.match(/\(([^)]+)\)/);
+    if (urlMatch) {
+      return urlMatch[1];
     }
-    return relationships;
+
+    // If it's already a URL
+    if (discussionStr.startsWith("http")) {
+      return discussionStr;
+    }
+
+    return "";
   }
 
-  extractTags(title, content) {
-    const tags = [];
-    const titleLower = title.toLowerCase();
-    const contentLower = content.toLowerCase();
+  extractAbstractFromContent(markdown) {
+    const lines = markdown.split("\n");
+    let inTable = false;
 
-    // Common ACP topics
-    if (titleLower.includes("consensus") || contentLower.includes("consensus"))
-      tags.push("Consensus");
-    if (titleLower.includes("validator") || contentLower.includes("validator"))
-      tags.push("Validators");
-    if (titleLower.includes("staking") || contentLower.includes("staking"))
-      tags.push("Staking");
-    if (titleLower.includes("network") || contentLower.includes("network"))
-      tags.push("Network");
-    if (titleLower.includes("upgrade") || contentLower.includes("upgrade"))
-      tags.push("Upgrade");
-    if (titleLower.includes("fee") || contentLower.includes("fee"))
-      tags.push("Fees");
-    if (titleLower.includes("subnet") || contentLower.includes("subnet"))
-      tags.push("Subnets");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
 
-    return tags.slice(0, 3); // Limit to 3 tags
+      // Skip tables
+      if (trimmed.startsWith("|")) {
+        inTable = true;
+        continue;
+      }
+
+      if (inTable && trimmed.startsWith("#")) {
+        inTable = false;
+        continue;
+      }
+
+      // Find first substantial paragraph that's not a header or table
+      if (!inTable && !trimmed.startsWith("#") && trimmed.length > 50) {
+        let abstract = trimmed.substring(0, 200);
+        if (abstract.length === 200) abstract += "...";
+        return abstract;
+      }
+    }
+
+    return "No abstract available.";
   }
 
-  determineComplexity(content) {
-    const wordCount = content.split(/\s+/).length;
-    const technicalTerms = (
-      content.match(
-        /\b(implementation|algorithm|protocol|consensus|merkle|hash|signature|cryptograph|byzantine)\b/gi
-      ) || []
-    ).length;
+  calculateComplexity(content) {
+    const length = content.length;
+    const complexTerms = [
+      "implementation",
+      "algorithm",
+      "cryptographic",
+      "consensus",
+      "protocol",
+      "specification",
+      "technical",
+      "architecture",
+    ];
 
-    if (wordCount > 3000 || technicalTerms > 20) return "High";
-    if (wordCount > 1500 || technicalTerms > 10) return "Medium";
+    const hasComplexTerms = complexTerms.some((term) =>
+      content.toLowerCase().includes(term)
+    );
+
+    if (length > 10000 || hasComplexTerms) return "High";
+    if (length > 5000) return "Medium";
     return "Low";
+  }
+
+  extractTags(content, title) {
+    const tags = [];
+    const lowerContent = content.toLowerCase();
+    const lowerTitle = title.toLowerCase();
+
+    // Common ACP categories/tags
+    const tagKeywords = {
+      consensus: ["consensus", "validator", "staking"],
+      networking: ["network", "p2p", "communication"],
+      economics: ["fee", "economic", "incentive", "reward"],
+      governance: ["governance", "voting", "proposal"],
+      security: ["security", "cryptographic", "signature"],
+      performance: ["performance", "optimization", "efficiency"],
+      interoperability: ["interop", "bridge", "cross-chain"],
+      vm: ["virtual machine", "vm", "execution"],
+      api: ["api", "interface", "endpoint"],
+    };
+
+    for (const [tag, keywords] of Object.entries(tagKeywords)) {
+      if (
+        keywords.some(
+          (keyword) =>
+            lowerContent.includes(keyword) || lowerTitle.includes(keyword)
+        )
+      ) {
+        tags.push(tag);
+      }
+    }
+
+    return tags;
   }
 
   calculateStats() {
     this.stats.total = this.acps.length;
 
     this.acps.forEach((acp) => {
-      // Status
-      this.stats.byStatus[acp.status] =
-        (this.stats.byStatus[acp.status] || 0) + 1;
+      // Count by status
+      const status = acp.status || "Unknown";
+      this.stats.byStatus[status] = (this.stats.byStatus[status] || 0) + 1;
 
-      // Track
-      this.stats.byTrack[acp.track] = (this.stats.byTrack[acp.track] || 0) + 1;
+      // Count by track
+      const track = acp.track || "Unknown";
+      this.stats.byTrack[track] = (this.stats.byTrack[track] || 0) + 1;
 
-      // Complexity
-      if (acp.complexity) {
-        this.stats.byComplexity[acp.complexity] =
-          (this.stats.byComplexity[acp.complexity] || 0) + 1;
-      }
+      // Count by complexity
+      const complexity = acp.complexity || "Medium";
+      this.stats.byComplexity[complexity] =
+        (this.stats.byComplexity[complexity] || 0) + 1;
     });
   }
-
-  createIndex(folders) {
-    const indexPath = path.join(OUTPUT_DIR, "ACPs", "index.json");
-    const indexDir = path.dirname(indexPath);
-
-    if (!fs.existsSync(indexDir)) {
-      fs.mkdirSync(indexDir, { recursive: true });
-    }
-
-    const index = {
-      folders: folders,
-      generatedAt: new Date().toISOString(),
-    };
-
-    fs.writeFileSync(indexPath, JSON.stringify(index, null, 2));
-    console.log(`📄 Created index file at: ${indexPath}`);
-  }
 }
+
 // Run the builder
-const builder = new ACPBuilder();
-builder.build().catch(console.error);
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const builder = new ACPBuilder();
+  await builder.build();
+}
