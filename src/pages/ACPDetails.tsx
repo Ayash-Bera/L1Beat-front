@@ -1,5 +1,13 @@
+// src/pages/ACPDetails.tsx
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import 'katex/dist/katex.min.css';
 import { StatusBar } from '../components/StatusBar';
 import { Footer } from '../components/Footer';
 import {
@@ -18,7 +26,6 @@ import {
   RefreshCw,
   BookOpen
 } from 'lucide-react';
-import { marked } from 'marked';
 import { acpService, LocalACP } from '../services/acpService';
 
 export default function ACPDetails() {
@@ -76,6 +83,28 @@ export default function ACPDetails() {
     } catch (err) {
       console.error('Failed to copy:', err);
     }
+  };
+
+  // Custom code component for syntax highlighting
+  const CodeBlock = ({ children, className, ...props }: any) => {
+    const match = /language-(\w+)/.exec(className || '');
+    const language = match ? match[1] : '';
+    
+    return match ? (
+      <SyntaxHighlighter
+        style={vscDarkPlus}
+        language={language}
+        PreTag="div"
+        className="rounded-lg"
+        {...props}
+      >
+        {String(children).replace(/\n$/, '')}
+      </SyntaxHighlighter>
+    ) : (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
   };
 
   const getStatusIcon = (status: string) => {
@@ -187,7 +216,7 @@ export default function ACPDetails() {
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-lg font-mono text-blue-600 dark:text-blue-400">
+                  <span className="text-2xl font-mono text-blue-600 dark:text-blue-400 font-bold">
                     ACP-{acp.number}
                   </span>
                   <div className="flex items-center gap-2">
@@ -198,107 +227,37 @@ export default function ACPDetails() {
                   </div>
                 </div>
 
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
                   {acp.title}
                 </h1>
 
-                {acp.abstract && (
-                  <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
-                    {acp.abstract}
-                  </p>
-                )}
-
-                {/* Metadata */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {/* Authors */}
-                  <div className="flex items-start gap-2">
-                    <Users className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Authors</span>
-                      <div className="mt-1">
-                        {acp.authors.map((author, index) => (
-                          <div key={index} className="flex items-center gap-1 text-sm text-gray-900 dark:text-white">
-                            <span>{author.name}</span>
-                            {author.github && (
-                              <a
-                                href={`https://github.com/${author.github}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 dark:text-blue-400 hover:underline"
-                              >
-                                (@{author.github})
-                              </a>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                {/* Authors */}
+                <div className="flex items-center gap-2 mb-4">
+                  <Users className="w-5 h-5 text-gray-400" />
+                  <div className="flex flex-wrap gap-2">
+                    {acp.authors?.map((author, index) => (
+                      <a
+                        key={index}
+                        href={`https://github.com/${author.github}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      >
+                        {author.name}
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </a>
+                    )) || <span className="text-sm text-gray-600 dark:text-gray-400">Unknown</span>}
                   </div>
-
-                  {/* Track */}
-                  <div className="flex items-start gap-2">
-                    <Tag className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Track</span>
-                      <div className="mt-1">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-500/20 dark:text-gray-400">
-                          {acp.track}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Complexity */}
-                  {acp.complexity && (
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Complexity</span>
-                        <div className="mt-1">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            acp.complexity === 'High' ? 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400' :
-                            acp.complexity === 'Medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-400' :
-                            'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-400'
-                          }`}>
-                            {acp.complexity}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Reading Time */}
-                  {acp.readingTime && (
-                    <div className="flex items-start gap-2">
-                      <BookOpen className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Reading Time</span>
-                        <div className="mt-1">
-                          <span className="text-sm text-gray-900 dark:text-white">
-                            {acp.readingTime} min
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {/* Tags */}
-                {acp.tags && acp.tags.length > 0 && (
-                  <div className="flex items-center gap-2 mb-6">
-                    <Tag className="w-4 h-4 text-gray-400" />
-                    <div className="flex flex-wrap gap-2">
-                      {acp.tags.map((tag, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Track */}
+                <div className="flex items-center gap-2 mb-4">
+                  <Tag className="w-5 h-5 text-gray-400" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Track:</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                    {acp.track}
+                  </span>
+                </div>
 
                 {/* Actions */}
                 <div className="flex gap-3 flex-wrap">
@@ -347,31 +306,18 @@ export default function ACPDetails() {
             </div>
           </div>
 
-          {/* ACP Content */}
-          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="p-6">
-              <div
-                className="prose prose-lg dark:prose-invert max-w-none
-                  prose-headings:text-gray-900 dark:prose-headings:text-white
-                  prose-p:text-gray-700 dark:prose-p:text-gray-300
-                  prose-strong:text-gray-900 dark:prose-strong:text-white
-                  prose-a:text-blue-600 dark:prose-a:text-blue-400
-                  prose-code:text-gray-900 dark:prose-code:text-gray-100
-                  prose-code:bg-gray-100 dark:prose-code:bg-gray-800
-                  prose-pre:bg-gray-100 dark:prose-pre:bg-gray-800
-                  prose-blockquote:border-gray-300 dark:prose-blockquote:border-gray-600
-                  prose-blockquote:text-gray-700 dark:prose-blockquote:text-gray-300
-                  prose-table:text-gray-700 dark:prose-table:text-gray-300
-                  prose-th:text-gray-900 dark:prose-th:text-white
-                  prose-td:border-gray-300 dark:prose-td:border-gray-600
-                  prose-th:border-gray-300 dark:prose-th:border-gray-600"
-                dangerouslySetInnerHTML={{
-                  __html: marked.parse(acp.content, {
-                    breaks: true,
-                    gfm: true
-                  })
+          {/* Content with ReactMarkdown */}
+          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+            <div className="prose prose-gray dark:prose-invert max-w-none prose-table:table-auto prose-table:border-collapse prose-th:border prose-th:border-gray-300 prose-th:px-4 prose-th:py-2 prose-th:bg-gray-50 prose-td:border prose-td:border-gray-300 prose-td:px-4 prose-td:py-2">
+              <ReactMarkdown 
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+                components={{
+                  code: CodeBlock
                 }}
-              />
+              >
+                {acp.content}
+              </ReactMarkdown>
             </div>
           </div>
         </div>

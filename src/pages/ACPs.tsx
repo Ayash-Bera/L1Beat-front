@@ -1,3 +1,4 @@
+// src/pages/ACPs.tsx
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StatusBar } from '../components/StatusBar';
@@ -20,24 +21,18 @@ import {
   BookOpen,
   ChevronDown,
   Star,
-  Archive
+  Archive,
+  Code,
+  AlertCircle
 } from 'lucide-react';
-import { ACP } from '../types';
-import { acpService } from '../services/acpService';
+import { acpService, LocalACP } from '../services/acpService';
 
-// Add these interfaces to your types file
+// Simple interfaces for the working version
 interface ACPStats {
   total: number;
   byStatus: Record<string, number>;
   byTrack: Record<string, number>;
   byComplexity: Record<string, number>;
-}
-
-interface EnhancedACP extends ACP {
-  complexity?: string;
-  tags?: string[];
-  readingTime?: number;
-  abstract?: string;
 }
 
 type ViewMode = 'grid' | 'list';
@@ -54,7 +49,7 @@ interface Filters {
 
 export default function ACPs() {
   const navigate = useNavigate();
-  const [acps, setAcps] = useState<EnhancedACP[]>([]);
+  const [acps, setAcps] = useState<LocalACP[]>([]);
   const [stats, setStats] = useState<ACPStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,23 +83,14 @@ export default function ACPs() {
         console.log('Loading ACPs from local data...');
         const acpsData = await acpService.loadACPs();
         
-        if (!mounted) return; // Prevent state update if component unmounted
+        if (!mounted) return;
         
         if (acpsData.length === 0) {
           throw new Error('No ACPs found. Make sure the submodule is initialized and the build script has been run.');
         }
 
-        // Convert to EnhancedACP format
-        const enhancedACPs: EnhancedACP[] = acpsData.map(acp => ({
-          ...acp,
-          complexity: acp.complexity || 'Medium',
-          tags: acp.tags || [],
-          readingTime: Math.max(1, Math.ceil((acp.content?.length || 0) / 1000)),
-          abstract: acp.abstract || extractAbstract(acp.content || '')
-        }));
-
-        setAcps(enhancedACPs);
-        setStats(calculateStats(enhancedACPs));
+        setAcps(acpsData);
+        setStats(calculateStats(acpsData));
         setError(null);
       } catch (err) {
         if (!mounted) return;
@@ -122,39 +108,18 @@ export default function ACPs() {
     return () => {
       mounted = false;
     };
-  }, []); // Empty dependency array - only run once
+  }, []);
 
-  function extractAbstract(content: string): string {
-    // Extract first paragraph that's not a table or header
-    const lines = content.split('\n');
-    let abstract = '';
-    let inTable = false;
-    
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      
-      if (trimmed.startsWith('|')) {
-        inTable = true;
-        continue;
-      }
-      
-      if (inTable && trimmed.startsWith('#')) {
-        inTable = false;
-        continue;
-      }
-      
-      if (!inTable && !trimmed.startsWith('#') && trimmed.length > 50) {
-        abstract = trimmed.substring(0, 200);
-        if (abstract.length === 200) abstract += '...';
-        break;
-      }
-    }
-    
-    return abstract || 'No abstract available.';
-  }
+  const getCleanStatus = (status: string) => {
+    if (!status) return 'Unknown';
+    // Extracts the primary status from a detailed string.
+    // e.g., "Proposed (Last Call - Final Comments)" -> "Proposed"
+    // e.g., "Active [ACPs.md]" -> "Active"
+    const match = status.match(/^[a-zA-Z]+/);
+    return match ? match[0] : 'Unknown';
+  };
 
-  function calculateStats(acps: EnhancedACP[]): ACPStats {
+  function calculateStats(acps: LocalACP[]): ACPStats {
     const stats: ACPStats = {
       total: acps.length,
       byStatus: {},
@@ -162,28 +127,25 @@ export default function ACPs() {
       byComplexity: {}
     };
 
-    acps.forEach(acp => {
-      // Count by status
-      const status = acp.status || 'Unknown';
-      stats.byStatus[status] = (stats.byStatus[status] || 0) + 1;
+    const statusCounts: Record<string, number> = {};
 
-      // Count by track
+    acps.forEach(acp => {
+      const cleanStatus = getCleanStatus(acp.status || 'Unknown');
+      statusCounts[cleanStatus] = (statusCounts[cleanStatus] || 0) + 1;
+
       const track = acp.track || 'Unknown';
       stats.byTrack[track] = (stats.byTrack[track] || 0) + 1;
 
-      // Count by complexity
       const complexity = acp.complexity || 'Medium';
       stats.byComplexity[complexity] = (stats.byComplexity[complexity] || 0) + 1;
     });
 
+    stats.byStatus = statusCounts;
     return stats;
   }
 
   // Filter and sort ACPs
   const filteredAndSortedACPs = useMemo(() => {
-    console.log('Filtering and sorting ACPs...');
-    const startTime = performance.now();
-    
     let filtered = acps.filter(acp => {
       // Search filter
       if (searchQuery) {
@@ -198,7 +160,7 @@ export default function ACPs() {
       }
 
       // Status filter
-      if (filters.status && acp.status !== filters.status) return false;
+      if (filters.status && getCleanStatus(acp.status) !== filters.status) return false;
 
       // Track filter
       if (filters.track && acp.track !== filters.track) return false;
@@ -245,43 +207,75 @@ export default function ACPs() {
       return sortOrder === 'desc' ? -comparison : comparison;
     });
 
-    const filterTime = performance.now() - startTime;
-    console.log(`Filtered to ${filtered.length} ACPs in ${filterTime.toFixed(2)}ms`);
-    
     return filtered;
   }, [acps, searchQuery, filters, sortBy, sortOrder]);
 
   const getStatusIcon = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'activated':
+    const cleanStatus = getCleanStatus(status);
+    switch (cleanStatus?.toLowerCase()) {
       case 'final':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'active':
+      case 'activated':
+        return <CheckCircle className="w-4 h-4 text-white" />;
       case 'draft':
+      case 'proposed':
+        return <Clock className="w-4 h-4 text-white" />;
       case 'review':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
-      case 'stagnant':
+        return <AlertCircle className="w-4 h-4 text-white" />;
       case 'withdrawn':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'rejected':
+      case 'stagnant':
+      case 'stale':
+        return <XCircle className="w-4 h-4 text-white" />;
       default:
-        return <AlertTriangle className="w-4 h-4 text-gray-500" />;
+        return <AlertTriangle className="w-4 h-4 text-white" />;
     }
   };
 
   const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'activated':
+    const cleanStatus = getCleanStatus(status);
+    switch (cleanStatus?.toLowerCase()) {
       case 'final':
-        return 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-400';
+      case 'active':
+      case 'activated':
+        return 'bg-green-500 text-white';
       case 'draft':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400';
+      case 'proposed':
+        return 'bg-blue-500 text-white';
       case 'review':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-400';
-      case 'stagnant':
+        return 'bg-yellow-500 text-white';
       case 'withdrawn':
+      case 'rejected':
+      case 'stagnant':
+      case 'stale':
+        return 'bg-gray-500 text-white';
+      default:
+        return 'bg-gray-400 text-white';
+    }
+  };
+
+  const getComplexityColor = (complexity: string) => {
+    switch (complexity) {
+      case 'Low':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400';
+      case 'Medium':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-400';
+      case 'High':
         return 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-500/20 dark:text-gray-400';
     }
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      status: '',
+      track: '',
+      complexity: '',
+      author: '',
+      hasDiscussion: null
+    });
+    setSearchQuery('');
   };
 
   if (loading) {
@@ -295,7 +289,7 @@ export default function ACPs() {
               Loading ACPs...
             </h2>
             <p className="text-gray-600 dark:text-gray-300">
-              Loading Avalanche Community Proposals from local data.
+              Processing Avalanche Community Proposals
             </p>
           </div>
         </div>
@@ -316,20 +310,6 @@ export default function ACPs() {
             <p className="text-gray-600 dark:text-gray-300 mb-4">
               {error}
             </p>
-            {error.includes('submodule') && (
-              <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-lg p-4 mb-4 text-left">
-                <h3 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">
-                  Setup Instructions:
-                </h3>
-                <pre className="text-sm text-yellow-700 dark:text-yellow-300 whitespace-pre-wrap">
-{`# Initialize the submodule:
-git submodule update --init --recursive
-
-# Run the build script:
-npm run build:acps`}
-                </pre>
-              </div>
-            )}
             <button
               onClick={() => window.location.reload()}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -361,58 +341,50 @@ npm run build:acps`}
             </div>
           </div>
 
-          {/* Statistics Cards */}
+          {/* Stats */}
           {stats && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 p-3 rounded-lg bg-blue-100 dark:bg-blue-500/20">
-                    <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                  </div>
+                  <BookOpen className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total ACPs</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total ACPs</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 p-3 rounded-lg bg-green-100 dark:bg-green-500/20">
-                    <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                  </div>
+                  <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Activated</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Final</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {stats.byStatus['Activated'] || stats.byStatus['Final'] || 0}
+                      {(stats.byStatus['Final'] || 0) + (stats.byStatus['Activated'] || 0)}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 p-3 rounded-lg bg-yellow-100 dark:bg-yellow-500/20">
-                    <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-                  </div>
+                  <Clock className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">In Review</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {(stats.byStatus['Draft'] || 0) + (stats.byStatus['Review'] || 0)}
+                      {(stats.byStatus['Draft'] || 0) + (stats.byStatus['Review'] || 0) + (stats.byStatus['Proposed'] || 0)}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 p-3 rounded-lg bg-purple-100 dark:bg-purple-500/20">
-                    <Tag className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                  </div>
+                  <Code className="w-8 h-8 text-purple-600 dark:text-purple-400" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Tracks</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">High Complexity</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {Object.keys(stats.byTrack).length}
+                      {stats.byComplexity['High'] || 0}
                     </p>
                   </div>
                 </div>
@@ -420,321 +392,229 @@ npm run build:acps`}
             </div>
           )}
 
-          {/* Search and Filters */}
-          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-8 p-6">
+          {/* Search and Controls */}
+          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
             <div className="flex flex-col lg:flex-row gap-4">
               {/* Search */}
               <div className="flex-1">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
                     placeholder="Search ACPs by title, number, author, or content..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-dark-700 dark:text-white"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-dark-700 text-gray-900 dark:text-white"
                   />
                 </div>
               </div>
 
-              {/* View Mode Toggle */}
+              {/* Controls */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded-md ${
-                    viewMode === 'grid'
-                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
-                      : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`inline-flex items-center px-3 py-2 border rounded-md text-sm font-medium transition-colors ${
+                    showFilters
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-dark-700 dark:text-gray-200 dark:hover:bg-dark-600'
                   }`}
                 >
-                  <Grid className="w-4 h-4" />
+                  <Filter className="w-4 h-4 mr-2" />
+                  Filters
                 </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded-md ${
-                    viewMode === 'list'
-                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
-                      : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                  }`}
-                >
-                  <List className="w-4 h-4" />
-                </button>
-              </div>
 
-              {/* Filters Toggle */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-700 hover:bg-gray-50 dark:hover:bg-dark-600"
-              >
-                <Filter className="w-4 h-4 mr-2" />
-                Filters
-                <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-              </button>
+                <select
+                  value={`${sortBy}-${sortOrder}`}
+                  onChange={(e) => {
+                    const [newSortBy, newSortOrder] = e.target.value.split('-') as [SortOption, SortOrder];
+                    setSortBy(newSortBy);
+                    setSortOrder(newSortOrder);
+                  }}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="number-asc">Number (Low to High)</option>
+                  <option value="number-desc">Number (High to Low)</option>
+                  <option value="title-asc">Title (A to Z)</option>
+                  <option value="title-desc">Title (Z to A)</option>
+                  <option value="status-asc">Status (A to Z)</option>
+                </select>
+
+                <div className="flex border border-gray-300 dark:border-gray-600 rounded-md">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-2 ${
+                      viewMode === 'grid'
+                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
+                        : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    <Grid className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`p-2 ${
+                      viewMode === 'list'
+                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
+                        : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Filter Options */}
-            {showFilters && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Status
-                    </label>
-                    <select
-                      value={filters.status}
-                      onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-dark-700 text-gray-900 dark:text-white text-sm"
-                    >
-                      <option value="">All Statuses</option>
-                      {stats && Object.keys(stats.byStatus).map(status => (
-                        <option key={status} value={status}>{status}</option>
-                      ))}
-                    </select>
-                  </div>
+            {/* Filters */}
+            {showFilters && stats && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                  <select
+                    value={filters.status}
+                    onChange={(e) => setFilters({...filters, status: e.target.value})}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white"
+                  >
+                    <option value="">All Statuses</option>
+                    {Object.keys(stats.byStatus).map(status => (
+                      <option key={status} value={status}>{status} ({stats.byStatus[status]})</option>
+                    ))}
+                  </select>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Track
-                    </label>
-                    <select
-                      value={filters.track}
-                      onChange={(e) => setFilters(prev => ({ ...prev, track: e.target.value }))}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-dark-700 text-gray-900 dark:text-white text-sm"
-                    >
-                      <option value="">All Tracks</option>
-                      {stats && Object.keys(stats.byTrack).map(track => (
-                        <option key={track} value={track}>{track}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    value={filters.track}
+                    onChange={(e) => setFilters({...filters, track: e.target.value})}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white"
+                  >
+                    <option value="">All Tracks</option>
+                    {Object.keys(stats.byTrack).map(track => (
+                      <option key={track} value={track}>{track} ({stats.byTrack[track]})</option>
+                    ))}
+                  </select>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Complexity
-                    </label>
-                    <select
-                      value={filters.complexity}
-                      onChange={(e) => setFilters(prev => ({ ...prev, complexity: e.target.value }))}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-dark-700 text-gray-900 dark:text-white text-sm"
-                    >
-                      <option value="">All Complexities</option>
-                      {stats && Object.keys(stats.byComplexity).map(complexity => (
-                        <option key={complexity} value={complexity}>{complexity}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <select
+                    value={filters.complexity}
+                    onChange={(e) => setFilters({...filters, complexity: e.target.value})}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white"
+                  >
+                    <option value="">All Complexities</option>
+                    {Object.keys(stats.byComplexity).map(complexity => (
+                      <option key={complexity} value={complexity}>
+                        {complexity} ({stats.byComplexity[complexity]})
+                      </option>
+                    ))}
+                  </select>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Author
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Search by author..."
-                      value={filters.author}
-                      onChange={(e) => setFilters(prev => ({ ...prev, author: e.target.value }))}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-dark-700 text-gray-900 dark:text-white text-sm"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="Filter by author..."
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white"
+                    value={filters.author}
+                    onChange={(e) => setFilters({...filters, author: e.target.value})}
+                  />
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Discussion
-                    </label>
-                    <select
-                      value={filters.hasDiscussion === null ? '' : filters.hasDiscussion.toString()}
-                      onChange={(e) => setFilters(prev => ({ 
-                        ...prev, 
-                        hasDiscussion: e.target.value === '' ? null : e.target.value === 'true' 
-                      }))}
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-dark-700 text-gray-900 dark:text-white text-sm"
-                    >
-                      <option value="">All</option>
-                      <option value="true">Has Discussion</option>
-                      <option value="false">No Discussion</option>
-                    </select>
-                  </div>
+                  <select
+                    value={filters.hasDiscussion === null ? '' : filters.hasDiscussion.toString()}
+                    onChange={(e) => setFilters({
+                      ...filters, 
+                      hasDiscussion: e.target.value === '' ? null : e.target.value === 'true'
+                    })}
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white"
+                  >
+                    <option value="">All ACPs</option>
+                    <option value="true">With Discussion</option>
+                    <option value="false">No Discussion</option>
+                  </select>
+                </div>
+
+                <div className="mt-4 flex justify-between items-center">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Showing {filteredAndSortedACPs.length} of {stats.total} ACPs
+                  </span>
+                  <button
+                    onClick={clearFilters}
+                    className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    Clear all filters
+                  </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Sort Controls */}
-          <div className="flex items-center justify-between mb-6">
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              Showing {filteredAndSortedACPs.length} of {acps.length} ACPs
-            </p>
-            
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Sort by:
-                </label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1 bg-white dark:bg-dark-700 text-gray-900 dark:text-white text-sm"
-                >
-                  <option value="number">Number</option>
-                  <option value="title">Title</option>
-                  <option value="status">Status</option>
-                  <option value="track">Track</option>
-                </select>
-              </div>
-              
-              <button
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
-              >
-                <TrendingUp className={`w-4 h-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} />
-              </button>
-            </div>
-          </div>
-
-          {/* ACPs Grid/List */}
+          {/* Results */}
           {filteredAndSortedACPs.length === 0 ? (
             <div className="text-center py-12">
-              <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+              <Search className="w-12 h-12 mx-auto text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                No ACPs Found
+                No ACPs found
               </h3>
               <p className="text-gray-600 dark:text-gray-300">
-                {searchQuery || Object.values(filters).some(f => f) 
-                  ? 'Try adjusting your search or filters.'
-                  : 'No ACPs are available at the moment.'
-                }
+                Try adjusting your search query or filters.
               </p>
             </div>
           ) : (
-            <div className={viewMode === 'grid' 
-              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-              : 'space-y-4'
+            <div className={
+              viewMode === 'grid' 
+                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
+                : 'space-y-4'
             }>
               {filteredAndSortedACPs.map((acp) => (
                 <div
                   key={acp.number}
                   onClick={() => navigate(`/acps/${acp.number}`)}
-                  className={`
-                    bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 
-                    hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600 transition-all cursor-pointer
-                    ${viewMode === 'list' ? 'p-4' : 'p-6'}
-                  `}
+                  className={`bg-white dark:bg-dark-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-xl hover:border-blue-300 dark:hover:border-blue-500 hover:-translate-y-1 transition-all duration-300 cursor-pointer group ${
+                    viewMode === 'list' ? 'p-6' : 'p-6 h-full flex flex-col'
+                  }`}
                 >
-                  {viewMode === 'grid' ? (
-                    <>
-                      {/* Grid View */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-mono text-blue-600 dark:text-blue-400">
-                            ACP-{acp.number}
-                          </span>
+                  <div className={viewMode === 'list' ? 'flex items-start gap-6' : 'flex flex-col h-full'}>
+                    <div className="flex-1">
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-4">
+                        <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                          ACP-{acp.number}
+                        </span>
+                        <div className={`flex items-center gap-2 ${getStatusColor(acp.status)} px-3 py-1 rounded-full`}>
                           {getStatusIcon(acp.status)}
+                          <span className="text-xs font-medium">
+                            {getCleanStatus(acp.status)}
+                          </span>
                         </div>
-                        {acp.discussion && (
-                          <ExternalLink className="w-4 h-4 text-gray-400" />
-                        )}
                       </div>
 
-                      <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">
+                      {/* Title */}
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 leading-tight">
                         {acp.title}
                       </h3>
 
-                      {acp.abstract && (
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-3">
-                          {acp.abstract}
-                        </p>
-                      )}
+                      {/* Abstract */}
+                      <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-4 leading-relaxed">
+                        {acp.abstract || 'No description available.'}
+                      </p>
+                    </div>
 
-                      <div className="flex items-center gap-2 mb-3 flex-wrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(acp.status)}`}>
-                          {acp.status}
-                        </span>
-                        {acp.track && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-500/20 dark:text-gray-400">
-                            {acp.track}
-                          </span>
-                        )}
-                      </div>
-
+                    {/* Footer */}
+                    <div className="mt-auto pt-4 border-t border-gray-100 dark:border-gray-700">
                       <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center gap-1">
-                          <Users className="w-3 h-3" />
-                          <span>
-                            {acp.authors?.length ? 
-                              acp.authors.length === 1 
-                                ? acp.authors[0].name
-                                : `${acp.authors[0].name} +${acp.authors.length - 1}`
-                              : 'Unknown'
-                            }
+                        <div className="flex items-center gap-3">
+                          {acp.authors && acp.authors.length > 0 && acp.authors[0].name !== 'Unknown' && (
+                            <span className="flex items-center gap-1.5">
+                              <Users className="w-4 h-4" />
+                              {acp.authors[0].name}
+                              {acp.authors.length > 1 && (
+                                <span className="text-xs">+ {acp.authors.length - 1} more</span>
+                              )}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-4 h-4" />
+                            <span>{acp.readingTime || 5} min read</span>
                           </span>
                         </div>
-                        {acp.readingTime && (
-                          <div className="flex items-center gap-1">
-                            <BookOpen className="w-3 h-3" />
-                            <span>{acp.readingTime} min read</span>
-                          </div>
-                        )}
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded ${getComplexityColor(acp.complexity)}`}>
+                          {acp.track}
+                        </span>
                       </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* List View */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-mono text-blue-600 dark:text-blue-400">
-                              ACP-{acp.number}
-                            </span>
-                            {getStatusIcon(acp.status)}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-                              {acp.title}
-                            </h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(acp.status)}`}>
-                                {acp.status}
-                              </span>
-                              {acp.track && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-500/20 dark:text-gray-400">
-                                  {acp.track}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="hidden md:flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                            <div className="flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              <span>
-                                {acp.authors?.length ? 
-                                  acp.authors.length === 1 
-                                    ? acp.authors[0].name
-                                    : `${acp.authors[0].name} +${acp.authors.length - 1}`
-                                  : 'Unknown'
-                                }
-                              </span>
-                            </div>
-                            {acp.readingTime && (
-                              <div className="flex items-center gap-1">
-                                <BookOpen className="w-3 h-3" />
-                                <span>{acp.readingTime}m</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {acp.discussion && (
-                            <ExternalLink className="w-4 h-4 text-gray-400" />
-                          )}
-                          <ChevronDown className="w-4 h-4 text-gray-400 rotate-[-90deg]" />
-                        </div>
-                      </div>
-                    </>
-                  )}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -745,3 +625,4 @@ npm run build:acps`}
     </div>
   );
 }
+''
