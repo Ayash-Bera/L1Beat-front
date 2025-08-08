@@ -47,7 +47,7 @@ export default function ACPDetails() {
         setError(null);
 
         console.log(`Loading ACP-${acpNumber} from local data...`);
-        const acpData = await acpService.loadACP(acpNumber);
+        const acpData = await acpService.loadACPByNumber(acpNumber);
         
         if (!mounted) return;
         
@@ -219,12 +219,7 @@ export default function ACPDetails() {
                   <span className="text-2xl font-mono text-blue-600 dark:text-blue-400 font-bold">
                     ACP-{acp.number}
                   </span>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(acp.status)}
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(acp.status)}`}>
-                      {acp.status}
-                    </span>
-                  </div>
+                  
                 </div>
 
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
@@ -250,14 +245,7 @@ export default function ACPDetails() {
                   </div>
                 </div>
 
-                {/* Track */}
-                <div className="flex items-center gap-2 mb-4">
-                  <Tag className="w-5 h-5 text-gray-400" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Track:</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                    {acp.track}
-                  </span>
-                </div>
+                
 
                 {/* Actions */}
                 <div className="flex gap-3 flex-wrap">

@@ -116,10 +116,7 @@ const EnhancedACPCard = ({ acp, viewMode = 'grid', onClick }) => {
               <span className="text-lg font-mono font-semibold text-blue-600 dark:text-blue-400">
                 ACP-{acp.number}
               </span>
-              <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.text}`}>
-                <StatusIcon className="w-3 h-3 mr-1" />
-                {acp.status}
-              </div>
+              
             </div>
 
             {/* Title and Abstract */}
@@ -194,29 +191,10 @@ const EnhancedACPCard = ({ acp, viewMode = 'grid', onClick }) => {
               </div>
             )}
           </div>
-          <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusConfig.bg} ${statusConfig.text}`}>
-            <StatusIcon className="w-3 h-3 mr-1" />
-            {acp.status}
-          </div>
+          
         </div>
 
-        {/* Progress Bar */}
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-          <div
-            className={`h-full transition-all duration-500 ${
-              progressPercentage === 100 ? 'bg-green-500' : 'bg-blue-500'
-            }`}
-            style={{ width: `${progressPercentage}%` }}
-          />
-        </div>
-        <div className="flex justify-between items-center mt-1">
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {progressPercentage}% Complete
-          </span>
-          <span className={`text-xs ${implStatus.color}`}>
-            {implStatus.label}
-          </span>
-        </div>
+        
       </div>
 
       {/* Card Body */}
