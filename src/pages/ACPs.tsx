@@ -26,14 +26,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { acpService, LocalACP } from '../services/acpService';
+import EnhancedACPCard from '../components/ACPCard';
 
-// Simple interfaces for the working version
-interface ACPStats {
-  total: number;
-  byStatus: Record<string, number>;
-  byTrack: Record<string, number>;
-  byComplexity: Record<string, number>;
-}
 
 type ViewMode = 'grid' | 'list';
 type SortOption = 'number' | 'title' | 'status' | 'track';
@@ -88,7 +82,6 @@ export default function ACPs() {
         if (acpsData.length === 0) {
           throw new Error('No ACPs found. Make sure the submodule is initialized and the build script has been run.');
         }
-
         setAcps(acpsData);
         setStats(calculateStats(acpsData));
         setError(null);
@@ -119,28 +112,81 @@ export default function ACPs() {
     return match ? match[0] : 'Unknown';
   };
 
-  function calculateStats(acps: LocalACP[]): ACPStats {
+  function calculateStats(acps: EnhancedACP[]): ACPStats {
     const stats: ACPStats = {
       total: acps.length,
       byStatus: {},
       byTrack: {},
-      byComplexity: {}
+      byComplexity: {},
+      byCategory: {},
+      byImpact: {},
+      averageReadingTime: 0,
+      totalAuthors: 0,
+      implementationProgress: {
+        notStarted: 0,
+        inProgress: 0,
+        completed: 0,
+        deployed: 0,
+      },
+      recentlyUpdated: 0,
+      needsAttention: 0,
     };
 
-    const statusCounts: Record<string, number> = {};
+    const uniqueAuthors = new Set<string>();
+    let totalReadingTime = 0;
 
-    acps.forEach(acp => {
-      const cleanStatus = getCleanStatus(acp.status || 'Unknown');
-      statusCounts[cleanStatus] = (statusCounts[cleanStatus] || 0) + 1;
-
-      const track = acp.track || 'Unknown';
-      stats.byTrack[track] = (stats.byTrack[track] || 0) + 1;
-
-      const complexity = acp.complexity || 'Medium';
-      stats.byComplexity[complexity] = (stats.byComplexity[complexity] || 0) + 1;
+    acps.forEach((acp) => {
+      // Status
+      stats.byStatus[acp.status] = (stats.byStatus[acp.status] || 0) + 1;
+      
+      // Track
+      stats.byTrack[acp.track] = (stats.byTrack[acp.track] || 0) + 1;
+      
+      // Complexity
+      if (acp.complexity) {
+        stats.byComplexity[acp.complexity] = (stats.byComplexity[acp.complexity] || 0) + 1;
+      }
+      
+      // Category
+      if (acp.category) {
+        stats.byCategory[acp.category] = (stats.byCategory[acp.category] || 0) + 1;
+      }
+      
+      // Impact
+      if (acp.impact) {
+        stats.byImpact[acp.impact] = (stats.byImpact[acp.impact] || 0) + 1;
+      }
+      
+      // Authors
+      acp.authors.forEach(author => uniqueAuthors.add(author.name));
+      
+      // Reading time
+      totalReadingTime += (acp.readingTime || 0);
+      
+      // Implementation progress
+      const implStatus = acp.implementationStatus || 'not-started';
+      if (implStatus === 'not-started') stats.implementationProgress.notStarted++;
+      else if (implStatus === 'in-progress') stats.implementationProgress.inProgress++;
+      else if (implStatus === 'completed') stats.implementationProgress.completed++;
+      else if (implStatus === 'deployed') stats.implementationProgress.deployed++;
+      
+      // Recently updated (within 30 days)
+      if (acp.updated) {
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        if (new Date(acp.updated).getTime() > thirtyDaysAgo) {
+          stats.recentlyUpdated++;
+        }
+      }
+      
+      // Needs attention
+      if (['Stale', 'Withdrawn'].includes(acp.status)) {
+        stats.needsAttention++;
+      }
     });
 
-    stats.byStatus = statusCounts;
+    stats.totalAuthors = uniqueAuthors.size;
+    stats.averageReadingTime = acps.length > 0 ? totalReadingTime / acps.length : 0;
+
     return stats;
   }
 
@@ -322,7 +368,6 @@ export default function ACPs() {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex flex-col">
       <StatusBar health={null} />
@@ -336,126 +381,151 @@ export default function ACPs() {
                 Avalanche Community Proposals
               </h1>
               <p className="mt-2 text-gray-600 dark:text-gray-300">
-                Browse and explore all ACPs in the Avalanche ecosystem.
+                Browse and explore all ACPs in the Avalanche ecosystem
               </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </button>
             </div>
           </div>
 
-          {/* Stats */}
+          {/* Statistics Cards */}
           {stats && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <div className="flex items-center">
-                  <BookOpen className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total ACPs</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+            <div className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {stats.total}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Total ACPs</div>
                   </div>
+                  <FileText className="w-8 h-8 text-blue-500 opacity-50" />
                 </div>
               </div>
-
-              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <div className="flex items-center">
-                  <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Final</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {(stats.byStatus['Final'] || 0) + (stats.byStatus['Activated'] || 0)}
-                    </p>
+              
+              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {stats.totalAuthors || 0}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Contributors</div>
                   </div>
+                  <Users className="w-8 h-8 text-green-500 opacity-50" />
                 </div>
               </div>
-
-              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <div className="flex items-center">
-                  <Clock className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">In Progress</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {(stats.byStatus['Draft'] || 0) + (stats.byStatus['Review'] || 0) + (stats.byStatus['Proposed'] || 0)}
-                    </p>
+              
+              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {stats.implementationProgress?.deployed || 0}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Deployed</div>
                   </div>
+                  <CheckCircle className="w-8 h-8 text-green-500 opacity-50" />
                 </div>
               </div>
-
-              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <div className="flex items-center">
-                  <Code className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">High Complexity</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {stats.byComplexity['High'] || 0}
-                    </p>
+              
+              <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {stats.recentlyUpdated || 0}
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">Recently Updated</div>
                   </div>
+                  <TrendingUp className="w-8 h-8 text-yellow-500 opacity-50" />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Search and Controls */}
-          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
-            <div className="flex flex-col lg:flex-row gap-4">
-              {/* Search */}
-              <div className="flex-1">
+          {/* Controls Bar */}
+          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              {/* Search Bar */}
+              <div className="flex-1 max-w-xl">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Search ACPs by title, number, author, or content..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-dark-700 dark:text-white"
+                    placeholder="Search ACPs by number, title, or author..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-dark-700 dark:text-white"
                   />
                 </div>
               </div>
 
               {/* Controls */}
               <div className="flex items-center gap-2">
+                {/* Filter Button */}
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`inline-flex items-center px-3 py-2 border rounded-md text-sm font-medium transition-colors ${
+                  className={`inline-flex items-center px-4 py-2 border rounded-md text-sm font-medium transition-colors ${
                     showFilters
-                      ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500'
-                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-dark-700 dark:text-gray-200 dark:hover:bg-dark-600'
+                      ? 'border-blue-500 text-blue-600 bg-blue-50 dark:bg-blue-500/10'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-700 hover:bg-gray-50 dark:hover:bg-dark-600'
                   }`}
                 >
                   <Filter className="w-4 h-4 mr-2" />
                   Filters
+                  {Object.values(filters).filter(f => f !== '' && f !== null).length > 0 && (
+                    <span className="ml-2 px-2 py-0.5 text-xs bg-blue-500 text-white rounded-full">
+                      {Object.values(filters).filter(f => f !== '' && f !== null).length}
+                    </span>
+                  )}
                 </button>
 
-                <select
-                  value={`${sortBy}-${sortOrder}`}
-                  onChange={(e) => {
-                    const [newSortBy, newSortOrder] = e.target.value.split('-') as [SortOption, SortOrder];
-                    setSortBy(newSortBy);
-                    setSortOrder(newSortOrder);
-                  }}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="number-asc">Number (Low to High)</option>
-                  <option value="number-desc">Number (High to Low)</option>
-                  <option value="title-asc">Title (A to Z)</option>
-                  <option value="title-desc">Title (Z to A)</option>
-                  <option value="status-asc">Status (A to Z)</option>
-                </select>
+                {/* Sort Dropdown */}
+                <div className="relative">
+                  <select
+                    value={`${sortBy}-${sortOrder}`}
+                    onChange={(e) => {
+                      const [newSortBy, newSortOrder] = e.target.value.split('-') as [SortOption, SortOrder];
+                      setSortBy(newSortBy);
+                      setSortOrder(newSortOrder);
+                    }}
+                    className="appearance-none px-4 py-2 pr-8 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-700 hover:bg-gray-50 dark:hover:bg-dark-600 cursor-pointer"
+                  >
+                    <option value="number-desc">Number (High to Low)</option>
+                    <option value="number-asc">Number (Low to High)</option>
+                    <option value="title-asc">Title (A to Z)</option>
+                    <option value="title-desc">Title (Z to A)</option>
+                    <option value="status-asc">Status</option>
+                    <option value="track-asc">Track</option>
+                    <option value="complexity-asc">Complexity</option>
+                    <option value="impact-desc">Impact (High to Low)</option>
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                </div>
 
-                <div className="flex border border-gray-300 dark:border-gray-600 rounded-md">
+                {/* View Mode Toggle */}
+                <div className="flex items-center bg-gray-100 dark:bg-dark-700 rounded-md p-1">
                   <button
                     onClick={() => setViewMode('grid')}
-                    className={`p-2 ${
+                    className={`p-2 rounded ${
                       viewMode === 'grid'
-                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
-                        : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
+                        ? 'bg-white dark:bg-dark-600 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
                   >
                     <Grid className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`p-2 ${
+                    className={`p-2 rounded ${
                       viewMode === 'list'
-                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
-                        : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
+                        ? 'bg-white dark:bg-dark-600 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
                   >
                     <List className="w-4 h-4" />
@@ -464,165 +534,175 @@ export default function ACPs() {
               </div>
             </div>
 
-            {/* Filters */}
-            {showFilters && stats && (
+            {/* Filters Panel */}
+            {showFilters && (
               <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                  <select
-                    value={filters.status}
-                    onChange={(e) => setFilters({...filters, status: e.target.value})}
-                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white"
-                  >
-                    <option value="">All Statuses</option>
-                    {Object.keys(stats.byStatus).map(status => (
-                      <option key={status} value={status}>{status} ({stats.byStatus[status]})</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {/* Status Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={filters.status}
+                      onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-dark-700 dark:text-white"
+                    >
+                      <option value="">All</option>
+                      <option value="Draft">Draft</option>
+                      <option value="Review">Review</option>
+                      <option value="Proposed">Proposed</option>
+                      <option value="Implementable">Implementable</option>
+                      <option value="Activated">Activated</option>
+                      <option value="Stale">Stale</option>
+                      <option value="Withdrawn">Withdrawn</option>
+                    </select>
+                  </div>
 
-                  <select
-                    value={filters.track}
-                    onChange={(e) => setFilters({...filters, track: e.target.value})}
-                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white"
-                  >
-                    <option value="">All Tracks</option>
-                    {Object.keys(stats.byTrack).map(track => (
-                      <option key={track} value={track}>{track} ({stats.byTrack[track]})</option>
-                    ))}
-                  </select>
+                  {/* Track Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Track
+                    </label>
+                    <select
+                      value={filters.track}
+                      onChange={(e) => setFilters({ ...filters, track: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-dark-700 dark:text-white"
+                    >
+                      <option value="">All</option>
+                      <option value="Standards Track">Standards Track</option>
+                      <option value="Best Practices Track">Best Practices</option>
+                      <option value="Meta Track">Meta Track</option>
+                      <option value="Subnet Track">Subnet Track</option>
+                    </select>
+                  </div>
 
-                  <select
-                    value={filters.complexity}
-                    onChange={(e) => setFilters({...filters, complexity: e.target.value})}
-                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white"
-                  >
-                    <option value="">All Complexities</option>
-                    {Object.keys(stats.byComplexity).map(complexity => (
-                      <option key={complexity} value={complexity}>
-                        {complexity} ({stats.byComplexity[complexity]})
-                      </option>
-                    ))}
-                  </select>
+                  {/* Complexity Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Complexity
+                    </label>
+                    <select
+                      value={filters.complexity}
+                      onChange={(e) => setFilters({ ...filters, complexity: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-dark-700 dark:text-white"
+                    >
+                      <option value="">All</option>
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Very High">Very High</option>
+                    </select>
+                  </div>
 
-                  <input
-                    type="text"
-                    placeholder="Filter by author..."
-                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white"
-                    value={filters.author}
-                    onChange={(e) => setFilters({...filters, author: e.target.value})}
-                  />
+                  {/* Author Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Author
+                    </label>
+                    <input
+                      type="text"
+                      value={filters.author}
+                      onChange={(e) => setFilters({ ...filters, author: e.target.value })}
+                      placeholder="Filter by author..."
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-dark-700 dark:text-white"
+                    />
+                  </div>
 
-                  <select
-                    value={filters.hasDiscussion === null ? '' : filters.hasDiscussion.toString()}
-                    onChange={(e) => setFilters({
-                      ...filters, 
-                      hasDiscussion: e.target.value === '' ? null : e.target.value === 'true'
-                    })}
-                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-dark-700 dark:text-white"
-                  >
-                    <option value="">All ACPs</option>
-                    <option value="true">With Discussion</option>
-                    <option value="false">No Discussion</option>
-                  </select>
-                </div>
+                  {/* Has Discussion Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Discussion
+                    </label>
+                    <select
+                      value={filters.hasDiscussion === null ? '' : filters.hasDiscussion.toString()}
+                      onChange={(e) => setFilters({ 
+                        ...filters, 
+                        hasDiscussion: e.target.value === '' ? null : e.target.value === 'true' 
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm dark:bg-dark-700 dark:text-white"
+                    >
+                      <option value="">All</option>
+                      <option value="true">Has Discussion</option>
+                      <option value="false">No Discussion</option>
+                    </select>
+                  </div>
 
-                <div className="mt-4 flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Showing {filteredAndSortedACPs.length} of {stats.total} ACPs
-                  </span>
-                  <button
-                    onClick={clearFilters}
-                    className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    Clear all filters
-                  </button>
+                  {/* Clear Filters */}
+                  <div className="flex items-end">
+                    <button
+                      onClick={() => setFilters({
+                        status: '',
+                        track: '',
+                        complexity: '',
+                        author: '',
+                        hasDiscussion: null
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-700 hover:bg-gray-50 dark:hover:bg-dark-600"
+                    >
+                      Clear All
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Results */}
+          {/* Results Count */}
+          <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+            Showing {filteredAndSortedACPs.length} of {acps.length} ACPs
+          </div>
+
+          {/* ACPs Grid/List */}
           {filteredAndSortedACPs.length === 0 ? (
             <div className="text-center py-12">
-              <Search className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+              <Archive className="w-12 h-12 mx-auto text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 No ACPs found
               </h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Try adjusting your search query or filters.
+              <p className="text-gray-600 dark:text-gray-400">
+                Try adjusting your search or filters
               </p>
             </div>
-          ) : (
-            <div className={
-              viewMode === 'grid' 
-                ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
-                : 'space-y-4'
-            }>
+          ) : viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredAndSortedACPs.map((acp) => (
-                <div
+                <EnhancedACPCard
                   key={acp.number}
-                  onClick={() => navigate(`/acps/${acp.number}`)}
-                  className={`bg-white dark:bg-dark-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-xl hover:border-blue-300 dark:hover:border-blue-500 hover:-translate-y-1 transition-all duration-300 cursor-pointer group ${
-                    viewMode === 'list' ? 'p-6' : 'p-6 h-full flex flex-col'
-                  }`}
-                >
-                  <div className={viewMode === 'list' ? 'flex items-start gap-6' : 'flex flex-col h-full'}>
-                    <div className="flex-1">
-                      {/* Header */}
-                      <div className="flex items-start justify-between mb-4">
-                        <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                          ACP-{acp.number}
-                        </span>
-                        <div className={`flex items-center gap-2 ${getStatusColor(acp.status)} px-3 py-1 rounded-full`}>
-                          {getStatusIcon(acp.status)}
-                          <span className="text-xs font-medium">
-                            {getCleanStatus(acp.status)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Title */}
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-2 leading-tight">
-                        {acp.title}
-                      </h3>
-
-                      {/* Abstract */}
-                      <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-4 leading-relaxed">
-                        {acp.abstract || 'No description available.'}
-                      </p>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="mt-auto pt-4 border-t border-gray-100 dark:border-gray-700">
-                      <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center gap-3">
-                          {acp.authors && acp.authors.length > 0 && acp.authors[0].name !== 'Unknown' && (
-                            <span className="flex items-center gap-1.5">
-                              <Users className="w-4 h-4" />
-                              {acp.authors[0].name}
-                              {acp.authors.length > 1 && (
-                                <span className="text-xs">+ {acp.authors.length - 1} more</span>
-                              )}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="w-4 h-4" />
-                            <span>{acp.readingTime || 5} min read</span>
-                          </span>
-                        </div>
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded ${getComplexityColor(acp.complexity)}`}>
-                          {acp.track}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  acp={acp}
+                  viewMode="grid"
+                  onClick={(acp) => navigate(`/acps/${acp.number}`)}
+                />
               ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredAndSortedACPs.map((acp) => (
+                <EnhancedACPCard
+                  key={acp.number}
+                  acp={acp}
+                  viewMode="list"
+                  onClick={(acp) => navigate(`/acps/${acp.number}`)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Load More / Pagination (if needed) */}
+          {filteredAndSortedACPs.length > 0 && filteredAndSortedACPs.length < acps.length && (
+            <div className="mt-8 text-center">
+              <button className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Load More
+              </button>
             </div>
           )}
         </div>
       </div>
+
+      {/* Footer */}
       <Footer />
     </div>
   );
 }
-''
+
+// export default ACPs;

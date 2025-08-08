@@ -110,7 +110,17 @@ export interface TeleporterDailyData {
 
 export type TimeframeOption = 7 | 14 | 30;
 
-// ACP related types
+// ============= ACP TYPES =============
+
+// Base Author interface
+export interface Author {
+  name: string;
+  github: string;
+  email?: string;
+  organization?: string;
+}
+
+// Base ACP interface - keep for backward compatibility
 export interface ACP {
   number: string;
   title: string;
@@ -121,60 +131,133 @@ export interface ACP {
   discussion?: string;
 }
 
-export interface Author {
-  name: string;
-  github: string;
-}
-export interface ACP {
-  number: string;
-  title: string;
-  authors: { name: string; github: string }[];
-  status: string;
-  track: string;
-  content: string;
-  discussion?: string;
-}
-
-// Enhanced ACP interface with additional metadata
+// Enhanced ACP with all metadata - REPLACE YOUR EXISTING EnhancedACP
 export interface EnhancedACP extends ACP {
-  complexity?: string;
-  tags?: string[];
-  readingTime?: number;
-  abstract?: string;
-  dependencies?: string[];
-  replaces?: string[];
-  supersededBy?: string[];
+  // Additional metadata fields
   folderName?: string;
+  
+  // Dates and timeline
+  created?: string;
+  updated?: string;
+  proposed?: string;
+  implementable?: string;
+  activated?: string;
+  stale?: string;
+  
+  // Content metadata
+  abstract: string;
+  motivation?: string;
+  specification?: string;
+  securityConsiderations?: string;
+  openQuestions?: string[];
+  
+  // Relationships
+  requires?: string[];
+  replaces?: string[];
+  replacedBy?: string;
+  relatedAcps?: string[];
+  dependencies?: string[];  // Alias for requires (backward compatibility)
+  supersededBy?: string;     // Alias for replacedBy (backward compatibility)
+  
+  // Implementation details
+  implementationStatus?: string;  // Keep as string for flexibility
+  implementationUrl?: string;
+  referenceImplementation?: string;
+  testnetDeployment?: string;
+  mainnetDeployment?: string;
+  
+  // Categorization - using strings for backward compatibility
+  complexity?: string;
+  category?: string;
+  subcategory?: string;
+  tags?: string[];
+  impact?: string;
+  
+  // Metrics
+  wordCount?: number;
+  readingTime?: number;
+  codeBlockCount?: number;
+  externalLinks?: ExternalLink[];
+  tableCount?: number;
+  imageCount?: number;
+  
+  // Discussion and engagement
+  discussions?: Discussion[];
+  primaryDiscussion?: string;
+  communitySupport?: CommunitySupport;
+  
+  // Search and indexing
+  searchableText?: string;
+  keywords?: string[];
 }
 
-// Statistics interface for ACP analytics
+// Supporting interfaces
+export interface ExternalLink {
+  url: string;
+  type: 'discussion' | 'implementation' | 'documentation' | 'reference' | 'other';
+  title?: string;
+  platform?: string;
+}
+
+export interface Discussion {
+  url: string;
+  platform: 'github' | 'forum' | 'discord' | 'twitter' | 'other';
+  title?: string;
+  commentCount?: number;
+  lastActivity?: string;
+  participants?: number;
+}
+
+export interface CommunitySupport {
+  supportPercentage?: number;
+  votesFor?: number;
+  votesAgainst?: number;
+  votesAbstain?: number;
+  totalVotes?: number;
+  quorumReached?: boolean;
+}
+
+// Statistics interface
 export interface ACPStats {
   total: number;
   byStatus: Record<string, number>;
   byTrack: Record<string, number>;
   byComplexity: Record<string, number>;
+  byCategory?: Record<string, number>;
+  byImpact?: Record<string, number>;
+  averageReadingTime?: number;
+  totalAuthors?: number;
+  implementationProgress?: {
+    notStarted: number;
+    inProgress: number;
+    completed: number;
+    deployed: number;
+  };
+  recentlyUpdated?: number;
+  needsAttention?: number;
 }
 
-// Filter and UI state types
-export type ViewMode = 'grid' | 'list';
-export type SortOption = 'number' | 'title' | 'status' | 'track' | 'complexity';
-export type SortOrder = 'asc' | 'desc';
-
+// Filter interfaces
 export interface ACPFilters {
   status: string;
   track: string;
   complexity: string;
+  category?: string;
+  impact?: string;
   author: string;
   hasDiscussion: boolean | null;
+  hasImplementation?: boolean | null;
+  dateRange?: {
+    start: string;
+    end: string;
+  };
+  search?: string;
 }
 
-// Utility functions for ACP management
-export interface ACPSearchOptions {
-  query: string;
-  filters: Partial<ACPFilters>;
-  sortBy: SortOption;
-  sortOrder: SortOrder;
-}
+// View and sorting options
+export type ViewMode = 'grid' | 'list' | 'timeline' | 'pipeline';
+export type SortOption = 'number' | 'title' | 'status' | 'track' | 'complexity' | 'impact' | 'updated' | 'created';
+export type SortOrder = 'asc' | 'desc';
 
 // ACP relationship types
 export interface ACPRelationship {
@@ -202,11 +285,13 @@ export interface ACPListResponse {
   acps: EnhancedACP[];
   stats: ACPStats;
   total: number;
+  page?: number;
+  pageSize?: number;
+  hasMore?: boolean;
 }
 
-export interface ACPSearchResponse {
-  acps: EnhancedACP[];
-  total: number;
+export interface ACPSearchResponse extends ACPListResponse {
   query: string;
   filters: ACPFilters;
+  suggestions?: string[];
 }
