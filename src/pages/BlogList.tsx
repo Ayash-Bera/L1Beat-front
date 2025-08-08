@@ -5,7 +5,7 @@ import { BlogPost, getBlogPosts, getBlogTags, BlogTag } from '../api/blogApi';
 import { BlogCard } from '../components/BlogCard';
 import { StatusBar } from '../components/StatusBar';
 import { Footer } from '../components/Footer';
-import { HealthStatus } from '../types';
+import { getHealth } from '../api';
 
 export function BlogList() {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -19,7 +19,7 @@ export function BlogList() {
     );
     const [hasMore, setHasMore] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [health] = useState<HealthStatus | null>(null);
+    const [health, setHealth] = useState<HealthStatus | null>(null);
 
     const POSTS_PER_PAGE = 12;
 
@@ -59,6 +59,7 @@ export function BlogList() {
     useEffect(() => {
         fetchPosts(0, selectedTag || undefined);
         fetchTags();
+        getHealth().then(setHealth);
     }, [selectedTag]);
 
     const handleTagFilter = (tag: string | null) => {

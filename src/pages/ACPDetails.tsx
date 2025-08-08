@@ -26,6 +26,8 @@ import {
   RefreshCw,
   BookOpen
 } from 'lucide-react';
+import { getHealth } from '../api';
+import { HealthStatus } from '../types';
 import { acpService, LocalACP } from '../services/acpService';
 
 export default function ACPDetails() {
@@ -35,6 +37,7 @@ export default function ACPDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [health, setHealth] = useState<HealthStatus | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -47,7 +50,10 @@ export default function ACPDetails() {
         setError(null);
 
         console.log(`Loading ACP-${acpNumber} from local data...`);
-        const acpData = await acpService.loadACPByNumber(acpNumber);
+        const [acpData, healthData] = await Promise.all([
+          acpService.loadACPByNumber(acpNumber),
+          getHealth(),
+        ]);
         
         if (!mounted) return;
         
@@ -57,6 +63,7 @@ export default function ACPDetails() {
         }
 
         setAcp(acpData);
+        setHealth(healthData);
       } catch (err) {
         if (!mounted) return;
         console.error(`Error loading ACP-${acpNumber}:`, err);
@@ -143,7 +150,7 @@ export default function ACPDetails() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex flex-col">
-        <StatusBar health={null} />
+        <StatusBar health={health} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
@@ -162,7 +169,7 @@ export default function ACPDetails() {
   if (error || !acp) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex flex-col">
-        <StatusBar health={null} />
+        <StatusBar health={health} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md">
             <AlertTriangle className="w-8 h-8 mx-auto mb-4 text-red-600" />
@@ -196,7 +203,7 @@ export default function ACPDetails() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex flex-col">
-      <StatusBar health={null} />
+      <StatusBar health={health} />
 
       <div className="flex-1">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

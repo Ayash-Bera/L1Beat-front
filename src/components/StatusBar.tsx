@@ -1,7 +1,7 @@
 import { CheckCircle, AlertTriangle, Menu, X, ExternalLink } from 'lucide-react';
 import { HealthStatus } from '../types';
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 
 interface StatusBarProps {
@@ -14,6 +14,7 @@ export function StatusBar({ health }: StatusBarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const controlNavbar = () => {
@@ -35,6 +36,7 @@ export function StatusBar({ health }: StatusBarProps) {
       setIsAnimating(true);
       setTimeout(() => setIsAnimating(false), 1000);
     }
+    navigate('/');
   };
 
   const isActive = (path: string) => {
@@ -62,8 +64,7 @@ export function StatusBar({ health }: StatusBarProps) {
           <div className="flex items-center justify-between h-16">
             {/* Logo and Health Status */}
             <div className="flex items-center gap-6">
-              <Link
-                to="/"
+              <button
                 onClick={handleLogoClick}
                 className="relative transform transition-all duration-300 hover:scale-105 focus:outline-none group"
               >
@@ -77,7 +78,18 @@ export function StatusBar({ health }: StatusBarProps) {
                   className={`h-8 w-auto relative ${isAnimating ? 'animate-heartbeat' : ''
                     } transition-transform duration-300`}
                 />
-              </Link>
+              </button>
+
+              {health && (
+                <div className="hidden md:flex items-center gap-2 pl-6 border-l border-gray-200 dark:border-dark-700">
+                  <div className="p-1.5 rounded-lg bg-green-100 dark:bg-green-500/20">
+                    <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  </div>
+                  <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                    All Systems Operational
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Desktop Navigation */}

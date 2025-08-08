@@ -25,7 +25,8 @@ import {
   Code,
   AlertCircle
 } from 'lucide-react';
-import { acpService, LocalACP } from '../services/acpService';
+import { getHealth } from '../api';
+import { acpService, LocalACP, EnhancedACP, ACPStats } from '../services/acpService';
 import EnhancedACPCard from '../components/ACPCard';
 
 
@@ -64,6 +65,8 @@ export default function ACPs() {
     hasDiscussion: null
   });
 
+  const [health, setHealth] = useState<HealthStatus | null>(null);
+
   useEffect(() => {
     let mounted = true;
     
@@ -75,7 +78,10 @@ export default function ACPs() {
         setError(null);
 
         console.log('Loading ACPs from local data...');
-        const acpsData = await acpService.loadACPs();
+        const [acpsData, healthData] = await Promise.all([
+          acpService.loadACPs(),
+          getHealth(),
+        ]);
         
         if (!mounted) return;
         
@@ -84,6 +90,7 @@ export default function ACPs() {
         }
         setAcps(acpsData);
         setStats(calculateStats(acpsData));
+        setHealth(healthData);
         setError(null);
       } catch (err) {
         if (!mounted) return;
@@ -327,7 +334,7 @@ export default function ACPs() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex flex-col">
-        <StatusBar health={null} />
+        <StatusBar health={health} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
@@ -346,7 +353,7 @@ export default function ACPs() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex flex-col">
-        <StatusBar health={null} />
+        <StatusBar health={health} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md">
             <AlertTriangle className="w-8 h-8 mx-auto mb-4 text-red-600" />
@@ -370,7 +377,7 @@ export default function ACPs() {
   }
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex flex-col">
-      <StatusBar health={null} />
+      <StatusBar health={health} />
 
       <div className="flex-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
