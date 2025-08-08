@@ -230,7 +230,7 @@ export default function ACPDetails() {
                 </div>
 
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-                  {acp.title}
+                  <ReactMarkdown>{acp.title}</ReactMarkdown>
                 </h1>
 
                 {/* Authors */}

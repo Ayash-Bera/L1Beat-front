@@ -275,7 +275,7 @@ class EnhancedACPBuilder {
         }
 
         // Parse metadata table
-        if (inTable && line.includes("| **")) {
+        if (inTable && line.trim().startsWith("|") && !line.includes("---")) {
           this.parseTableRow(line, metadata);
         }
 
@@ -286,8 +286,8 @@ class EnhancedACPBuilder {
             currentSection = sectionMatch[1].toLowerCase();
             sectionContent[currentSection] = "";
           }
-        } else if (currentSection && trimmed) {
-          sectionContent[currentSection] += trimmed + " ";
+        } else if (currentSection) {
+          sectionContent[currentSection] += line + "\n";
         }
       }
 
@@ -360,6 +360,7 @@ class EnhancedACPBuilder {
       return metadata;
     } catch (error) {
       console.warn(`Failed to parse ACP-${acpNumber}:`, error.message);
+      console.warn(`Full error for ACP-${acpNumber}:`, error);
       return null;
     }
   }
@@ -368,7 +369,7 @@ class EnhancedACPBuilder {
     const parts = line.split("|").map((p) => p.trim());
     if (parts.length < 3) return;
 
-    const field = parts[1].replace(/\*\*/g, "").toLowerCase();
+    const field = parts[1].replace(/\*\*/g, "").toLowerCase().trim();
     const value = parts[2].replace(/\*\*/g, "").trim();
 
     if (field.includes("title")) {
@@ -444,14 +445,9 @@ class EnhancedACPBuilder {
     const content = sectionContent[sectionName];
     if (!content) return defaultValue;
 
-    // Limit to 300 characters for abstract/summary
-    if (sectionName === "abstract") {
-      return (
-        content.substring(0, 300).trim() + (content.length > 300 ? "..." : "")
-      );
-    }
+    
 
-    return content.trim();
+    return content.trim().replace(/_/g, '\\_');
   }
 
   extractACPReferences(sectionContent, field) {

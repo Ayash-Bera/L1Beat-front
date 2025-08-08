@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   Users,
   Clock,
@@ -73,12 +74,12 @@ const EnhancedACPCard = ({ acp, viewMode = 'grid', onClick }) => {
                 ACP-{acp.number}
               </span>
               <h3 className="text-base font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                {acp.title}
+                <ReactMarkdown>{acp.title}</ReactMarkdown>
               </h3>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-              {acp.abstract}
-            </p>
+            <div className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+              <ReactMarkdown>{acp.abstract}</ReactMarkdown>
+            </div>
           </div>
           <div className="flex items-center gap-6">
             <div className="flex flex-col items-end gap-2">
@@ -116,12 +117,12 @@ const EnhancedACPCard = ({ acp, viewMode = 'grid', onClick }) => {
         </div>
 
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mb-2 leading-tight">
-          {acp.title}
+          <ReactMarkdown>{acp.title}</ReactMarkdown>
         </h3>
 
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-4 leading-relaxed">
-          {acp.abstract}
-        </p>
+        <div className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-4 leading-relaxed">
+          <ReactMarkdown>{acp.abstract}</ReactMarkdown>
+        </div>
       </div>
 
       <div className="pt-4 border-t border-gray-100 dark:border-gray-700">

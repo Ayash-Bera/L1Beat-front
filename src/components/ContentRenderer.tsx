@@ -1,3 +1,5 @@
+import ReactMarkdown from 'react-markdown';
+
 // ContentRenderer.tsx - New component for structured content
 
 import React from 'react';
@@ -44,8 +46,9 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ blocks }) => {
           <div 
             key={index}
             className="mb-6 leading-relaxed text-gray-700 dark:text-gray-300"
-            dangerouslySetInnerHTML={{ __html: block.content || '' }}
-          />
+          >
+            <ReactMarkdown>{block.content || ''}</ReactMarkdown>
+          </div>
         );
 
       case 'image':
@@ -90,8 +93,9 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({ blocks }) => {
             <div className="absolute top-4 left-2 text-blue-400 text-4xl font-serif">"</div>
             <div 
               className="text-gray-700 dark:text-gray-300 italic text-lg leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: block.content || '' }}
-            />
+            >
+              <ReactMarkdown>{block.content || ''}</ReactMarkdown>
+            </div>
           </blockquote>
         );
 
