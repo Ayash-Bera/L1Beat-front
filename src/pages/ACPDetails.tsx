@@ -29,6 +29,14 @@ import {
 import { getHealth } from '../api';
 import { HealthStatus } from '../types';
 import { acpService, LocalACP } from '../services/acpService';
+const preprocessContent = (content: string) => {
+  return content
+    // Only escape very specific, obvious currency tokens - be extremely conservative
+    .replace(/\$AVAX(?!\s*[+\-*/=<>≥≤\\{}()^_])/g, '&#36;AVAX')
+    .replace(/\$AVAX-([A-Za-z][A-Za-z\-]*)/g, '&#36;AVAX-$1')
+    .replace(/\$ETH(?!\s*[+\-*/=<>≥≤\\{}()^_])/g, '&#36;ETH')
+    .replace(/\$ETH-([A-Za-z][A-Za-z\-]*)/g, '&#36;ETH-$1');
+};
 
 export default function ACPDetails() {
   const { acpNumber } = useParams<{ acpNumber: string }>();
@@ -303,16 +311,16 @@ export default function ACPDetails() {
 
           {/* Content with ReactMarkdown */}
           <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 overflow-hidden">
-            <div className="prose prose-gray dark:prose-invert max-w-none break-words overflow-wrap-anywhere prose-table:table-auto prose-table:border-collapse prose-th:border prose-th:border-gray-300 prose-th:px-4 prose-th:py-2 prose-th:bg-gray-50 prose-td:border prose-td:border-gray-300 prose-td:px-4 prose-td:py-2">
+            <div className="prose prose-gray dark:prose-invert max-w-none break-words prose-table:table-auto prose-table:border-collapse prose-th:border prose-th:border-gray-300 prose-th:px-4 prose-th:py-2 prose-th:bg-gray-50 prose-td:border prose-td:border-gray-300 prose-td:px-4 prose-td:py-2">
               <ReactMarkdown 
-                remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeKatex]}
-                components={{
-                  code: CodeBlock
-                }}
-              >
-                {acp.content}
-              </ReactMarkdown>
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+              components={{
+                code: CodeBlock
+              }}
+            >
+              {preprocessContent(acp.content)}
+            </ReactMarkdown>
             </div>
           </div>
         </div>

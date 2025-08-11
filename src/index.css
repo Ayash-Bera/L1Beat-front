@@ -229,6 +229,33 @@
   .prose a {
     @apply text-blue-600 dark:text-blue-400 hover:underline;
   }
+
+    /* More aggressive word breaking for mathematical expressions */
+    .prose em,
+    .prose i {
+      word-break: break-all !important;
+      overflow-wrap: anywhere !important;
+      line-break: anywhere !important;
+      hyphens: auto !important;
+    }
+  
+    /* Target ReactMarkdown generated content specifically */
+    .prose p em,
+    .prose p i {
+      word-break: break-all !important;
+      overflow-wrap: anywhere !important;
+      white-space: pre-wrap !important;
+      display: inline !important;
+    }
+  
+    /* Handle dollar signs and mathematical notation */
+    .prose em:before,
+    .prose em:after,
+    .prose i:before,
+    .prose i:after {
+      content: '';
+      word-break: break-all;
+    }
 }
 
 .fade-in {
