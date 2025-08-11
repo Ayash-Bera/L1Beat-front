@@ -14,7 +14,6 @@
     "predev": "npm run build-acps"
   },
   "dependencies": {
-    "@tailwindcss/typography": "^0.5.16",
     "@tanstack/react-virtual": "^3.0.0",
     "axios": "^1.11.0",
     "chart.js": "^4.4.2",
@@ -47,6 +46,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@tailwindcss/typography": "^0.5.16",
     "@types/d3": "^7.4.3",
     "@types/d3-sankey": "^0.12.3",
     "@types/marked": "^5.0.2",

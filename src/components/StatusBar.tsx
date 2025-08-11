@@ -13,6 +13,7 @@ export function StatusBar({ health }: StatusBarProps) {
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -42,6 +43,29 @@ export function StatusBar({ health }: StatusBarProps) {
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
+  
+  const ComingSoonBlog = ({ isMobile = false }) => (
+    <div className="relative">
+      <button
+        className={`${isMobile ? 'block px-3 py-2 text-base' : 'px-4 py-2 text-sm'} font-medium rounded-md transition-colors text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer`}
+        onMouseEnter={() => setShowComingSoon(true)}
+        onMouseLeave={() => setShowComingSoon(false)}
+        onClick={(e) => {
+          e.preventDefault();
+          setShowComingSoon(true);
+          setTimeout(() => setShowComingSoon(false), 2000);
+        }}
+      >
+        Blog
+      </button>
+      {showComingSoon && (
+        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-md shadow-lg whitespace-nowrap z-50">
+          Coming Soon
+          <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 dark:bg-gray-700 rotate-45"></div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className={`sticky top-0 z-50 transform transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'
@@ -69,7 +93,8 @@ export function StatusBar({ health }: StatusBarProps) {
                 className="relative transform transition-all duration-300 hover:scale-105 focus:outline-none group"
               >
                 <div
-                  className={`absolute inset-0 bg-red-500/20 dark:bg-red-500/30 rounded-lg filter blur-xl transition-opacity duration-500 ${isAnimating ? 'animate-heartbeat-glow' : 'opacity-0'
+                  className={`absolute inset-0 bg-red-500/20 dark:bg-red-500/30 rounded-lg filter blur-xl transition-opacity duration-500 ${isAnimating ?
+                    'animate-heartbeat-glow' : 'opacity-0'
                     }`}
                 />
                 <img
@@ -95,15 +120,7 @@ export function StatusBar({ health }: StatusBarProps) {
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-6">
               <div className="flex items-center gap-4">
-                <Link
-                  to="/blog"
-                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${isActive('/blog')
-                    ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300'
-                    : 'text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400'
-                    }`}
-                >
-                  Blog
-                </Link>
+                <ComingSoonBlog />
 
                 <a
                   href="https://docs.avax.network/"
@@ -149,16 +166,7 @@ export function StatusBar({ health }: StatusBarProps) {
           <div className={`md:hidden transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
             }`}>
             <div className="px-2 pt-2 pb-3 space-y-1 border-t border-gray-200 dark:border-dark-700">
-              <Link
-                to="/blog"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${isActive('/blog')
-                  ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300'
-                  : 'text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400'
-                  }`}
-              >
-                Blog
-              </Link>
+              <ComingSoonBlog isMobile={true} />
 
               <a
                 href="https://docs.avax.network/"
