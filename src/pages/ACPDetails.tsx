@@ -1,4 +1,5 @@
 // src/pages/ACPDetails.tsx
+import mermaid from 'mermaid';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
@@ -35,7 +36,16 @@ const preprocessContent = (content: string) => {
     .replace(/\$AVAX(?!\s*[+\-*/=<>≥≤\\{}()^_])/g, '&#36;AVAX')
     .replace(/\$AVAX-([A-Za-z][A-Za-z\-]*)/g, '&#36;AVAX-$1')
     .replace(/\$ETH(?!\s*[+\-*/=<>≥≤\\{}()^_])/g, '&#36;ETH')
-    .replace(/\$ETH-([A-Za-z][A-Za-z\-]*)/g, '&#36;ETH-$1');
+    .replace(/\$ETH-([A-Za-z][A-Za-z\-]*)/g, '&#36;ETH-$1')
+    .replace(/\n*\[!NOTE\]\s*(.*?)(?=\n\n|\n(?=[A-Z])|$)/gs, (match, noteContent) => {
+      return `\n\n:::note\n${noteContent.trim()}\n\n\n`;
+    })
+    // Convert [WARNING] blocks if they exist
+    .replace(/\n*\[!WARNING\]\s*(.*?)(?=\n\n|\n(?=[A-Z])|$)/gs, (match, warningContent) => {
+      return `\n\n:::warning\n${warningContent.trim()}\n\n\n`;
+    })
+    .replace(/<div[^>]*>/g, '')
+    .replace(/<\/div>/g, '');
 };
 
 export default function ACPDetails() {
@@ -100,27 +110,94 @@ export default function ACPDetails() {
     }
   };
 
-  // Custom code component for syntax highlighting
-  const CodeBlock = ({ children, className, ...props }: any) => {
-    const match = /language-(\w+)/.exec(className || '');
-    const language = match ? match[1] : '';
+const CodeBlock = ({ children, className, ...props }: any) => {
+  const match = /language-(\w+)/.exec(className || '');
+  const language = match ? match[1] : '';
+  const content = String(children).trim();
+  
+  // Initialize mermaid once
+  React.useEffect(() => {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      securityLevel: 'loose',
+      themeVariables: {
+        primaryColor: '#3b82f6',
+        primaryTextColor: '#ffffff',
+        primaryBorderColor: '#1e40af',
+        lineColor: '#6b7280',
+        secondaryColor: '#1f2937',
+        tertiaryColor: '#374151',
+        background: '#111827',
+        mainBkg: '#1f2937',
+        secondBkg: '#374151',
+      }
+    });
+  }, []);
+
+  // Check if this is a mermaid diagram
+  const isMermaid = language === 'mermaid' || 
+                   content.includes('flowchart') || 
+                   content.includes('graph') ||
+                   content.includes('sequenceDiagram') ||
+                   content.includes('classDiagram');
+
+  if (isMermaid) {
+    const chartId = `mermaid-chart-${Math.random().toString(36).substr(2, 9)}`;
     
-    return match ? (
+    React.useEffect(() => {
+      const renderChart = async () => {
+        try {
+          const element = document.getElementById(chartId);
+          if (element) {
+            // Clear previous content
+            element.innerHTML = '';
+            
+            // Render the diagram
+            const { svg } = await mermaid.render(`${chartId}-svg`, content);
+            element.innerHTML = svg;
+          }
+        } catch (error) {
+          console.error('Mermaid rendering error:', error);
+          const element = document.getElementById(chartId);
+          if (element) {
+            element.innerHTML = `<div class="text-red-400 p-4">Error rendering diagram: ${error.message}</div>`;
+          }
+        }
+      };
+      
+      if (document.getElementById(chartId)) {
+        renderChart();
+      }
+    }, [chartId, content]);
+
+    return (
+      <div className="my-8 p-6 bg-gray-900 dark:bg-gray-800 rounded-lg overflow-auto">
+        <div id={chartId} className="flex justify-center min-h-[200px] items-center text-gray-400">
+          <div>Loading diagram...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Regular code blocks
+  return match ? (
+    <div className="my-6">
       <SyntaxHighlighter
         style={vscDarkPlus}
         language={language}
         PreTag="div"
         className="rounded-lg"
-        {...props}
       >
-        {String(children).replace(/\n$/, '')}
+        {content}
       </SyntaxHighlighter>
-    ) : (
-      <code className={className} {...props}>
-        {children}
-      </code>
-    );
-  };
+    </div>
+  ) : (
+    <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm font-mono" {...props}>
+      {children}
+    </code>
+  );
+};
 
   const getStatusIcon = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -312,15 +389,61 @@ export default function ACPDetails() {
           {/* Content with ReactMarkdown */}
           <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 overflow-hidden">
             <div className="prose prose-gray dark:prose-invert max-w-none break-words prose-table:table-auto prose-table:border-collapse prose-th:border prose-th:border-gray-300 prose-th:px-4 prose-th:py-2 prose-th:bg-gray-50 prose-td:border prose-td:border-gray-300 prose-td:px-4 prose-td:py-2">
-              <ReactMarkdown 
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeKatex]}
-              components={{
-                code: CodeBlock
-              }}
-            >
-              {preprocessContent(acp.content)}
-            </ReactMarkdown>
+            <ReactMarkdown 
+  remarkPlugins={[remarkGfm, remarkMath]}
+  rehypePlugins={[rehypeKatex]}
+  components={{
+    code: CodeBlock,
+    // Handle custom note blocks
+    p: ({ children, ...props }) => {
+      const text = String(children);
+      
+      // Check if this paragraph starts with our note syntax
+      if (text.startsWith(':::note')) {
+        const noteContent = text.replace(/^:::note\s*/, '').replace(/:::$/, '');
+        return (
+          <div className="my-6 p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-r-lg">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-5 h-5 text-blue-500 mt-0.5">
+                <svg fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">Note</div>
+                <div className="text-sm text-blue-700 dark:text-blue-300">{noteContent}</div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      
+      if (text.startsWith(':::warning')) {
+        const warningContent = text.replace(/^:::warning\s*/, '').replace(/:::$/, '');
+        return (
+          <div className="my-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 rounded-r-lg">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-5 h-5 text-yellow-500 mt-0.5">
+                <svg fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-1">Warning</div>
+                <div className="text-sm text-yellow-700 dark:text-yellow-300">{warningContent}</div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      
+      // Regular paragraph
+      return <p {...props}>{children}</p>;
+    }
+  }}
+>
+  {preprocessContent(acp.content)}
+</ReactMarkdown>
             </div>
           </div>
         </div>
