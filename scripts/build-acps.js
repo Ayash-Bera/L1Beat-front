@@ -38,6 +38,52 @@ class EnhancedACPBuilder {
     };
   }
 
+  getCleanStatus(status) {
+    if (!status) return "Unknown";
+
+    // Extracts the primary status from a detailed string.
+    // e.g., "Proposed (Discussion)" -> "Proposed"
+    // e.g., "Active [ACPs.md]" -> "Active"
+    // e.g., "Proposed (Last Call - Final Comments)" -> "Proposed"
+    const match = status.match(/^[a-zA-Z]+/);
+    return match ? match[0] : "Unknown";
+  }
+
+  // Modify the parseTableRow method - replace the existing method
+  parseTableRow(line, metadata) {
+    const parts = line.split("|").map((p) => p.trim());
+    if (parts.length < 3) return;
+
+    const field = parts[1].replace(/\*\*/g, "").toLowerCase().trim();
+    const value = parts[2].replace(/\*\*/g, "").trim();
+
+    if (field.includes("title")) {
+      metadata.title = value;
+    } else if (field.includes("author")) {
+      metadata.authors = this.parseAuthors(value);
+    } else if (field.includes("status")) {
+      // Apply status cleaning here
+      metadata.status = this.getCleanStatus(value);
+    } else if (field.includes("track")) {
+      metadata.track = value;
+    } else if (field.includes("discussion")) {
+      const discussionUrl = this.extractDiscussionUrl(value);
+      if (discussionUrl) {
+        metadata.discussions.push({
+          url: discussionUrl,
+          platform: this.detectPlatform(discussionUrl),
+          title: "Primary Discussion",
+        });
+      }
+    } else if (field.includes("created")) {
+      metadata.proposed = value;
+    } else if (field.includes("requires")) {
+      metadata.requires = this.extractACPNumbers(value);
+    } else if (field.includes("replaces")) {
+      metadata.replaces = this.extractACPNumbers(value);
+    }
+  }
+
   async build() {
     console.log(
       "🚀 Enhanced ACP Builder - Starting comprehensive metadata extraction..."
@@ -365,38 +411,6 @@ class EnhancedACPBuilder {
     }
   }
 
-  parseTableRow(line, metadata) {
-    const parts = line.split("|").map((p) => p.trim());
-    if (parts.length < 3) return;
-
-    const field = parts[1].replace(/\*\*/g, "").toLowerCase().trim();
-    const value = parts[2].replace(/\*\*/g, "").trim();
-
-    if (field.includes("title")) {
-      metadata.title = value;
-    } else if (field.includes("author")) {
-      metadata.authors = this.parseAuthors(value);
-    } else if (field.includes("status")) {
-      metadata.status = value;
-    } else if (field.includes("track")) {
-      metadata.track = value;
-    } else if (field.includes("discussion")) {
-      const discussionUrl = this.extractDiscussionUrl(value);
-      if (discussionUrl) {
-        metadata.discussions.push({
-          url: discussionUrl,
-          platform: this.detectPlatform(discussionUrl),
-          title: "Primary Discussion",
-        });
-      }
-    } else if (field.includes("created")) {
-      metadata.proposed = value;
-    } else if (field.includes("requires")) {
-      metadata.requires = this.extractACPNumbers(value);
-    } else if (field.includes("replaces")) {
-      metadata.replaces = this.extractACPNumbers(value);
-    }
-  }
 
   parseAuthors(authorsStr) {
     if (!authorsStr) return [];
@@ -445,9 +459,7 @@ class EnhancedACPBuilder {
     const content = sectionContent[sectionName];
     if (!content) return defaultValue;
 
-    
-
-    return content.trim().replace(/_/g, '\\_');
+    return content.trim().replace(/_/g, "\\_");
   }
 
   extractACPReferences(sectionContent, field) {

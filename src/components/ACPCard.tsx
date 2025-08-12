@@ -17,14 +17,27 @@ import {
 } from 'lucide-react';
 
 const EnhancedACPCard = ({ acp, viewMode = 'grid', onClick }) => {
-  const getImpactColor = (impact) => {
-    const colors = {
-      'Critical': 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
-      'High': 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300',
-      'Medium': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
-      'Low': 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
-    };
-    return colors[impact] || colors['Medium'];
+  const getStatusColor = (status) => {
+    const cleanStatus = status?.toLowerCase() || '';
+    
+    switch (cleanStatus) {
+      case 'final':
+      case 'active':
+      case 'activated':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
+      case 'draft':
+      case 'proposed':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
+      case 'review':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300';
+      case 'withdrawn':
+      case 'rejected':
+      case 'stagnant':
+      case 'stale':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-300';
+    }
   };
 
   const getComplexityIndicator = (complexity) => {
@@ -88,8 +101,8 @@ const EnhancedACPCard = ({ acp, viewMode = 'grid', onClick }) => {
                 <MetadataItem icon={BookOpen} label={`${acp.readingTime} min read`} />
               </div>
               <div className="flex items-center gap-4">
-                <span className={`px-2 py-1 rounded-md text-xs font-medium ${getImpactColor(acp.impact)}`}>
-                  {acp.impact} Impact
+                <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(acp.status)}`}>
+                {acp.status}
                 </span>
                 {getComplexityIndicator(acp.complexity)}
               </div>
@@ -111,8 +124,8 @@ const EnhancedACPCard = ({ acp, viewMode = 'grid', onClick }) => {
           <span className="text-xl font-bold font-mono text-blue-600 dark:text-blue-400">
             ACP-{acp.number}
           </span>
-          <span className={`px-2.5 py-1 rounded-md text-xs font-semibold ${getImpactColor(acp.impact)}`}>
-            {acp.impact} Impact
+          <span className={`px-2.5 py-1 rounded-md text-xs font-semibold ${getStatusColor(acp.status)}`}>
+          {acp.status}
           </span>
         </div>
 

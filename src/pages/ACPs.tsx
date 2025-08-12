@@ -119,83 +119,78 @@ export default function ACPs() {
     return match ? match[0] : 'Unknown';
   };
 
-  function calculateStats(acps: EnhancedACP[]): ACPStats {
-    const stats: ACPStats = {
-      total: acps.length,
-      byStatus: {},
-      byTrack: {},
-      byComplexity: {},
-      byCategory: {},
-      byImpact: {},
-      averageReadingTime: 0,
-      totalAuthors: 0,
-      implementationProgress: {
-        notStarted: 0,
-        inProgress: 0,
-        completed: 0,
-        deployed: 0,
-      },
-      recentlyUpdated: 0,
-      needsAttention: 0,
-    };
+    function calculateStats(acps: EnhancedACP[]): ACPStats {
+  const stats: ACPStats = {
+    total: acps.length,
+    byStatus: {},
+    byTrack: {},
+    byComplexity: {},
+    byCategory: {},
+    byImpact: {},
+    averageReadingTime: 0,
+    totalAuthors: 0,
+    implementationProgress: {
+      notStarted: 0,
+      inProgress: 0,
+      completed: 0,
+      deployed: 0,
+    },
+    recentlyUpdated: 0,
+    needsAttention: 0,
+  };
 
-    const uniqueAuthors = new Set<string>();
-    let totalReadingTime = 0;
+  const uniqueAuthors = new Set<string>();
+  let totalReadingTime = 0;
 
-    acps.forEach((acp) => {
-      // Status
-      stats.byStatus[acp.status] = (stats.byStatus[acp.status] || 0) + 1;
-      
-      // Track
-      stats.byTrack[acp.track] = (stats.byTrack[acp.track] || 0) + 1;
-      
-      // Complexity
-      if (acp.complexity) {
-        stats.byComplexity[acp.complexity] = (stats.byComplexity[acp.complexity] || 0) + 1;
+  acps.forEach((acp) => {
+    // Status - now using clean status directly
+    const cleanStatus = getCleanStatus(acp.status); // Keep as safety measure
+    stats.byStatus[cleanStatus] = (stats.byStatus[cleanStatus] || 0) + 1;
+    
+    // Track
+    stats.byTrack[acp.track] = (stats.byTrack[acp.track] || 0) + 1;
+    
+    // Rest remains the same...
+    if (acp.complexity) {
+      stats.byComplexity[acp.complexity] = (stats.byComplexity[acp.complexity] || 0) + 1;
+    }
+    
+    if (acp.category) {
+      stats.byCategory[acp.category] = (stats.byCategory[acp.category] || 0) + 1;
+    }
+    
+    if (acp.impact) {
+      stats.byImpact[acp.impact] = (stats.byImpact[acp.impact] || 0) + 1;
+    }
+    
+    acp.authors.forEach(author => uniqueAuthors.add(author.name));
+    totalReadingTime += (acp.readingTime || 0);
+    
+    const implStatus = acp.implementationStatus || 'not-started';
+    if (implStatus === 'not-started') stats.implementationProgress.notStarted++;
+    else if (implStatus === 'in-progress') stats.implementationProgress.inProgress++;
+    else if (implStatus === 'completed') stats.implementationProgress.completed++;
+    else if (implStatus === 'deployed') stats.implementationProgress.deployed++;
+    
+    if (acp.updated) {
+      const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      if (new Date(acp.updated).getTime() > thirtyDaysAgo) {
+        stats.recentlyUpdated++;
       }
-      
-      // Category
-      if (acp.category) {
-        stats.byCategory[acp.category] = (stats.byCategory[acp.category] || 0) + 1;
-      }
-      
-      // Impact
-      if (acp.impact) {
-        stats.byImpact[acp.impact] = (stats.byImpact[acp.impact] || 0) + 1;
-      }
-      
-      // Authors
-      acp.authors.forEach(author => uniqueAuthors.add(author.name));
-      
-      // Reading time
-      totalReadingTime += (acp.readingTime || 0);
-      
-      // Implementation progress
-      const implStatus = acp.implementationStatus || 'not-started';
-      if (implStatus === 'not-started') stats.implementationProgress.notStarted++;
-      else if (implStatus === 'in-progress') stats.implementationProgress.inProgress++;
-      else if (implStatus === 'completed') stats.implementationProgress.completed++;
-      else if (implStatus === 'deployed') stats.implementationProgress.deployed++;
-      
-      // Recently updated (within 30 days)
-      if (acp.updated) {
-        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-        if (new Date(acp.updated).getTime() > thirtyDaysAgo) {
-          stats.recentlyUpdated++;
-        }
-      }
-      
-      // Needs attention
-      if (['Stale', 'Withdrawn'].includes(acp.status)) {
-        stats.needsAttention++;
-      }
-    });
+    }
+    
+    // Update this to use clean status
+    if (['Stale', 'Withdrawn'].includes(cleanStatus)) {
+      stats.needsAttention++;
+    }
+  });
 
-    stats.totalAuthors = uniqueAuthors.size;
-    stats.averageReadingTime = acps.length > 0 ? totalReadingTime / acps.length : 0;
+  stats.totalAuthors = uniqueAuthors.size;
+  stats.averageReadingTime = acps.length > 0 ? totalReadingTime / acps.length : 0;
+  
+  return stats;
+}
 
-    return stats;
-  }
 
   // Filter and sort ACPs
   const filteredAndSortedACPs = useMemo(() => {
@@ -206,6 +201,8 @@ export default function ACPs() {
         const matchesSearch = 
           acp.title.toLowerCase().includes(query) ||
           acp.number.includes(query) ||
+          `acp${acp.number}`.toLowerCase().includes(query) ||
+          `acp-${acp.number}`.toLowerCase().includes(query) ||
           acp.authors?.some(author => author.name.toLowerCase().includes(query)) ||
           acp.abstract?.toLowerCase().includes(query);
         
@@ -264,7 +261,7 @@ export default function ACPs() {
   }, [acps, searchQuery, filters, sortBy, sortOrder]);
 
   const getStatusIcon = (status: string) => {
-    const cleanStatus = getCleanStatus(status);
+    const cleanStatus = getCleanStatus(status); 
     switch (cleanStatus?.toLowerCase()) {
       case 'final':
       case 'active':

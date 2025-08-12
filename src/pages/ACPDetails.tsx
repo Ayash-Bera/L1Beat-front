@@ -199,8 +199,15 @@ const CodeBlock = ({ children, className, ...props }: any) => {
   );
 };
 
+  const getCleanStatus = (status: string) => {
+    if (!status) return 'Unknown';
+    const match = status.match(/^[a-zA-Z]+/);
+    return match ? match[0] : 'Unknown';
+  };
+
   const getStatusIcon = (status: string) => {
-    switch (status?.toLowerCase()) {
+      const cleanStatus = getCleanStatus(status); // Add this line
+      switch (cleanStatus?.toLowerCase()) {
       case 'activated':
       case 'final':
         return <CheckCircle className="w-5 h-5 text-green-500" />;
@@ -216,7 +223,8 @@ const CodeBlock = ({ children, className, ...props }: any) => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
+      const cleanStatus = getCleanStatus(status);
+    switch (cleanStatus?.toLowerCase()) {
       case 'activated':
       case 'final':
         return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30';
