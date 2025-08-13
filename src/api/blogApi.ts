@@ -9,6 +9,7 @@ export interface BlogPost {
     content: string;
     mainContent?: string;  // NEW FIELD
     author: string;
+    authors: string[];
     publishedAt: string;
     updatedAt: string;
     tags: string[];
@@ -17,6 +18,53 @@ export interface BlogPost {
     readTime?: number;
 }
 
+
+export interface RelatedPost {
+    _id: string;
+    title: string;
+    slug: string;
+    excerpt: string;
+    publishedAt: string;
+    author: string;
+    authors: string[];
+    tags: string[];
+    imageUrl?: string;
+    readTime: number;
+    views: number;
+    matchingTagsCount: number;
+    matchingTags: string[];
+}
+
+export interface RelatedPostsResponse {
+    success: boolean;
+    data: RelatedPost[];
+    metadata: {
+        currentPost: string;
+        currentPostTags: string[];
+        totalFound: number;
+        retrievedAt: string;
+    };
+}
+
+export async function getRelatedPosts(slug: string, limit: number = 4): Promise<RelatedPostsResponse> {
+    try {
+        const response = await fetch(`${config.apiBaseUrl}/api/blog/posts/${slug}/related?limit=${limit}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error(`Error fetching related posts for ${slug}:`, error);
+        throw error;
+    }
+}
 export interface BlogPostsResponse {
     success: boolean;
     data: BlogPost[];
@@ -28,6 +76,40 @@ export interface BlogPostsResponse {
         tag?: string;
         requestId: string;
     };
+}
+export interface AuthorInfo {
+    name: string;
+    handle?: string;
+    avatar?: string;
+    bio?: string;
+}
+
+// Helper function to get formatted authors string
+export function getAuthorsDisplayString(post: BlogPost): string {
+    if (post.authors && post.authors.length > 0) {
+        if (post.authors.length === 1) {
+            return post.authors[0];
+        } else if (post.authors.length === 2) {
+            return `${post.authors[0]} and ${post.authors[1]}`;
+        } else {
+            const lastAuthor = post.authors[post.authors.length - 1];
+            const otherAuthors = post.authors.slice(0, -1).join(', ');
+            return `${otherAuthors}, and ${lastAuthor}`;
+        }
+    }
+    return post.author || 'L1Beat Team';
+}
+
+// Helper function to get primary author
+export function getPrimaryAuthor(post: BlogPost): string {
+    return post.authors && post.authors.length > 0 
+        ? post.authors[0] 
+        : post.author || 'L1Beat Team';
+}
+
+// Helper function to check if post has multiple authors
+export function hasMultipleAuthors(post: BlogPost): boolean {
+    return post.authors && post.authors.length > 1;
 }
 
 export interface BlogPostResponse {

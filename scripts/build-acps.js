@@ -6,8 +6,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
-
+import { execSync, spawnSync } from "child_process";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -198,19 +197,52 @@ class EnhancedACPBuilder {
 
   getGitMetadata(filePath) {
     try {
+      // Get relative path from git root to avoid absolute path issues
+      const relativePath = path.relative(process.cwd(), filePath);
       // Get creation date
-      const created = execSync(
-        `git log --follow --format=%aI --diff-filter=A -- "${filePath}" | tail -1`,
-        { encoding: "utf-8" }
-      ).trim();
+      const createdResult = spawnSync(
+        "git",
+        [
+          "log",
+          "--follow",
+          "--format=%aI",
+          "--diff-filter=A",
+          "--",
+          relativePath,
+        ],
+        {
+          encoding: "utf-8",
+          cwd: process.cwd(),
+        }
+      );
+
+      let created = null;
+      if (createdResult.status === 0 && createdResult.stdout) {
+        const lines = createdResult.stdout.trim().split("\n").filter(Boolean);
+        created = lines[lines.length - 1] || null; // Get the last (oldest) entry
+      }
 
       // Get last modification date
-      const updated = execSync(`git log -1 --format=%aI -- "${filePath}"`, {
-        encoding: "utf-8",
-      }).trim();
+      const updatedResult = spawnSync(
+        "git",
+        ["log", "-1", "--format=%aI", "--", relativePath],
+        {
+          encoding: "utf-8",
+          cwd: process.cwd(),
+        }
+      );
+
+      let updated = null;
+      if (updatedResult.status === 0 && updatedResult.stdout) {
+        updated = updatedResult.stdout.trim() || null;
+      }
 
       return { created, updated };
     } catch (error) {
+      console.warn(
+        `⚠️  Could not get git metadata for ${filePath}:`,
+        error.message
+      );
       return { created: null, updated: null };
     }
   }
@@ -410,7 +442,6 @@ class EnhancedACPBuilder {
       return null;
     }
   }
-
 
   parseAuthors(authorsStr) {
     if (!authorsStr) return [];
@@ -728,8 +759,24 @@ class EnhancedACPBuilder {
   }
 }
 
-// Run the enhanced builder
-if (import.meta.url === `file://${process.argv[1]}`) {
+async function main() {
   const builder = new EnhancedACPBuilder();
-  await builder.build();
+  try {
+    await builder.build();
+  } catch (error) {
+    console.error("💥 Fatal error in build script:", error);
+    process.exit(1);
+  }
+}
+
+// Space-safe entry point check
+const currentFilePath = fileURLToPath(import.meta.url);
+const executedFilePath = process.argv[1];
+
+// Normalize both paths to handle spaces and different path formats
+const isMainModule =
+  path.resolve(currentFilePath) === path.resolve(executedFilePath);
+// mian func call 
+if (isMainModule) {
+  main();
 }
