@@ -1,6 +1,7 @@
 import { CheckCircle, AlertTriangle, Menu, X, ExternalLink } from 'lucide-react';
 import { HealthStatus } from '../types';
 import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
 
 interface StatusBarProps {
@@ -11,8 +12,10 @@ export function StatusBar({ health }: StatusBarProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showTooltip, setShowTooltip] = useState<'blog' | 'acps' | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const controlNavbar = () => {
@@ -34,12 +37,39 @@ export function StatusBar({ health }: StatusBarProps) {
       setIsAnimating(true);
       setTimeout(() => setIsAnimating(false), 1000);
     }
+    navigate('/');
   };
 
+  const isActive = (path: string) => {
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
+  
+  const ComingSoonBlog = ({ isMobile = false }) => (
+    <div className="relative">
+      <button
+        className={`${isMobile ? 'block px-3 py-2 text-base' : 'px-4 py-2 text-sm'} font-medium rounded-md transition-colors text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer`}
+        onMouseEnter={() => setShowComingSoon(true)}
+        onMouseLeave={() => setShowComingSoon(false)}
+        onClick={(e) => {
+          e.preventDefault();
+          setShowComingSoon(true);
+          setTimeout(() => setShowComingSoon(false), 2000);
+        }}
+      >
+        Blog
+      </button>
+      {showComingSoon && (
+        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-md shadow-lg whitespace-nowrap z-50">
+          Coming Soon
+          <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 dark:bg-gray-700 rotate-45"></div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className={`sticky top-0 z-50 transform transition-transform duration-300 ${
-      isVisible ? 'translate-y-0' : '-translate-y-full'
-    }`}>
+    <div className={`sticky top-0 z-50 transform transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'
+      }`}>
       {/* Alpha Warning Banner */}
       <div className="bg-yellow-50 dark:bg-yellow-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
@@ -63,19 +93,18 @@ export function StatusBar({ health }: StatusBarProps) {
                 className="relative transform transition-all duration-300 hover:scale-105 focus:outline-none group"
               >
                 <div
-                  className={`absolute inset-0 bg-red-500/20 dark:bg-red-500/30 rounded-lg filter blur-xl transition-opacity duration-500 ${
-                    isAnimating ? 'animate-heartbeat-glow' : 'opacity-0'
-                  }`}
+                  className={`absolute inset-0 bg-red-500/20 dark:bg-red-500/30 rounded-lg filter blur-xl transition-opacity duration-500 ${isAnimating ?
+                    'animate-heartbeat-glow' : 'opacity-0'
+                    }`}
                 />
                 <img
                   src="https://raw.githubusercontent.com/muhammetselimfe/L1Beat/refs/heads/main/public/l1_logo_main_2.png"
                   alt="L1Beat"
-                  className={`h-8 w-auto relative ${
-                    isAnimating ? 'animate-heartbeat' : ''
-                  } transition-transform duration-300`}
+                  className={`h-8 w-auto relative ${isAnimating ? 'animate-heartbeat' : ''
+                    } transition-transform duration-300`}
                 />
               </button>
-              
+
               {health && (
                 <div className="hidden md:flex items-center gap-2 pl-6 border-l border-gray-200 dark:border-dark-700">
                   <div className="p-1.5 rounded-lg bg-green-100 dark:bg-green-500/20">
@@ -91,19 +120,8 @@ export function StatusBar({ health }: StatusBarProps) {
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-6">
               <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setShowTooltip('blog')}
-                  onMouseLeave={() => setShowTooltip(null)}
-                  className="relative px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                >
-                  Blog
-                  {showTooltip === 'blog' && (
-                    <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded">
-                      Coming soon
-                    </div>
-                  )}
-                </button>
-                
+                <ComingSoonBlog />
+
                 <a
                   href="https://docs.avax.network/"
                   target="_blank"
@@ -114,18 +132,15 @@ export function StatusBar({ health }: StatusBarProps) {
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
 
-                <button
-                  onClick={() => setShowTooltip('acps')}
-                  onMouseLeave={() => setShowTooltip(null)}
-                  className="relative px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-sm"
+                <Link
+                  to="/acps"
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${isActive('/acps')
+                    ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300'
+                    : 'text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400'
+                    }`}
                 >
                   ACPs
-                  {showTooltip === 'acps' && (
-                    <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded">
-                      Coming soon
-                    </div>
-                  )}
-                </button>
+                </Link>
               </div>
 
               <div className="h-6 w-px bg-gray-200 dark:bg-gray-700"></div>
@@ -148,63 +163,33 @@ export function StatusBar({ health }: StatusBarProps) {
           </div>
 
           {/* Mobile Menu */}
-          <div className={`md:hidden transition-all duration-300 ease-in-out ${
-            isMobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
-          }`}>
-            <div className="py-3 space-y-3">
-              {health && (
-                <div className="px-4 py-3 bg-gray-50 dark:bg-dark-700/50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-green-100 dark:bg-green-500/20">
-                      <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    </div>
-                    <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                      All Systems Operational
-                    </span>
-                  </div>
-                </div>
-              )}
+          <div className={`md:hidden transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+            }`}>
+            <div className="px-2 pt-2 pb-3 space-y-1 border-t border-gray-200 dark:border-dark-700">
+              <ComingSoonBlog isMobile={true} />
 
-              <div className="space-y-1">
-                <button
-                  onClick={() => {
-                    setShowTooltip('blog');
-                    setTimeout(() => setShowTooltip(null), 2000);
-                  }}
-                  className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-dark-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700"
-                >
-                  <span>Blog</span>
-                  {showTooltip === 'blog' && (
-                    <span className="text-xs text-blue-500 dark:text-blue-400">Coming soon</span>
-                  )}
-                </button>
+              <a
+                href="https://docs.avax.network/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                Docs
+              </a>
 
-                <a
-                  href="https://docs.avax.network/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-dark-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700"
-                >
-                  <span>Docs</span>
-                  <ExternalLink className="w-4 h-4" />
-                </a>
+              <Link
+                to="/acps"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${isActive('/acps')
+                  ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300'
+                  : 'text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400'
+                  }`}
+              >
+                ACPs
+              </Link>
 
-                <button
-                  onClick={() => {
-                    setShowTooltip('acps');
-                    setTimeout(() => setShowTooltip(null), 2000);
-                  }}
-                  className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-dark-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700"
-                >
-                  <span>ACPs</span>
-                  {showTooltip === 'acps' && (
-                    <span className="text-xs text-blue-500 dark:text-blue-400">Coming soon</span>
-                  )}
-                </button>
-              </div>
-
-              <div className="px-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
+              <div className="pt-4 border-t border-gray-200 dark:border-dark-700">
+                <div className="flex items-center justify-between px-3">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Theme</span>
                   <ThemeToggle />
                 </div>

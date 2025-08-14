@@ -1,0 +1,3 @@
+[submodule "public/acps"]
+	path = public/acps
+	url = https://github.com/avalanche-foundation/ACPs.git

@@ -1,177 +1,259 @@
+// src/pages/ACPDetails.tsx
+import mermaid from 'mermaid';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { marked } from 'marked';
-import { ACP } from '../types';
-import { ThemeToggle } from '../components/ThemeToggle';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import 'katex/dist/katex.min.css';
+import { StatusBar } from '../components/StatusBar';
 import { Footer } from '../components/Footer';
-import { 
-  ArrowLeft, 
-  ExternalLink, 
-  CheckCircle, 
-  Clock, 
+import {
+  ArrowLeft,
+  ExternalLink,
+  Users,
+  Tag,
+  Clock,
+  Github,
+  Link as LinkIcon,
+  Copy,
+  Check,
+  CheckCircle,
   XCircle,
   AlertTriangle,
   RefreshCw,
-  FileText
+  BookOpen
 } from 'lucide-react';
-import 'github-markdown-css/github-markdown.css';
+import { getHealth } from '../api';
+import { HealthStatus } from '../types';
+import { acpService, LocalACP } from '../services/acpService';
+const preprocessContent = (content: string) => {
+  return content
+    // Only escape very specific, obvious currency tokens - be extremely conservative
+    .replace(/\$AVAX(?!\s*[+\-*/=<>≥≤\\{}()^_])/g, '&#36;AVAX')
+    .replace(/\$AVAX-([A-Za-z][A-Za-z\-]*)/g, '&#36;AVAX-$1')
+    .replace(/\$ETH(?!\s*[+\-*/=<>≥≤\\{}()^_])/g, '&#36;ETH')
+    .replace(/\$ETH-([A-Za-z][A-Za-z\-]*)/g, '&#36;ETH-$1')
+    .replace(/\n*\[!NOTE\]\s*(.*?)(?=\n\n|\n(?=[A-Z])|$)/gs, (match, noteContent) => {
+      return `\n\n:::note\n${noteContent.trim()}\n\n\n`;
+    })
+    // Convert [WARNING] blocks if they exist
+    .replace(/\n*\[!WARNING\]\s*(.*?)(?=\n\n|\n(?=[A-Z])|$)/gs, (match, warningContent) => {
+      return `\n\n:::warning\n${warningContent.trim()}\n\n\n`;
+    })
+    .replace(/<div[^>]*>/g, '')
+    .replace(/<\/div>/g, '');
+};
 
-const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/avalanche-foundation/ACPs/main/ACPs';
-
-export function ACPDetails() {
-  const { number } = useParams();
+export default function ACPDetails() {
+  const { acpNumber } = useParams<{ acpNumber: string }>();
   const navigate = useNavigate();
-  const [acp, setAcp] = useState<ACP | null>(null);
+  const [acp, setAcp] = useState<LocalACP | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [health, setHealth] = useState<HealthStatus | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+    
     async function fetchACP() {
+      if (!acpNumber || !mounted) return;
+      
       try {
         setLoading(true);
         setError(null);
 
-        const readmeUrl = `${GITHUB_RAW_URL}/${number}-*/README.md`;
-        const response = await fetch(readmeUrl);
+        console.log(`Loading ACP-${acpNumber} from local data...`);
+        const [acpData, healthData] = await Promise.all([
+          acpService.loadACPByNumber(acpNumber),
+          getHealth(),
+        ]);
         
-        if (!response.ok) {
-          throw new Error('Failed to fetch ACP details');
+        if (!mounted) return;
+        
+        if (!acpData) {
+          setError(`ACP-${acpNumber} not found`);
+          return;
         }
 
-        const markdown = await response.text();
-        const parsedAcp = parseACPMarkdown(markdown, number || '');
-
-        if (!parsedAcp) {
-          throw new Error('Failed to parse ACP details');
-        }
-
-        setAcp(parsedAcp);
+        setAcp(acpData);
+        setHealth(healthData);
       } catch (err) {
-        console.error('Error fetching ACP:', err);
-        setError('Failed to load ACP details');
+        if (!mounted) return;
+        console.error(`Error loading ACP-${acpNumber}:`, err);
+        setError(err instanceof Error ? err.message : `Failed to load ACP-${acpNumber}`);
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
-    if (number) {
-      fetchACP();
-    }
-  }, [number]);
+    fetchACP();
+    
+    return () => {
+      mounted = false;
+    };
+  }, [acpNumber]);
 
-  function parseACPMarkdown(markdown: string, acpNumber: string): ACP | null {
+  const copyToClipboard = async () => {
     try {
-      const lines = markdown.split('\n');
-      let title = '';
-      let authors = [];
-      let status = '';
-      let track = '';
-      let discussion = '';
-      let inTable = false;
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-
-        if (line.startsWith('| ACP |')) {
-          inTable = true;
-          continue;
-        }
-
-        if (!inTable) continue;
-
-        if (line.startsWith('##')) break;
-
-        if (line.includes('| **Title** |')) {
-          title = line.split('|')[2].trim();
-        } else if (line.includes('| **Author(s)** |')) {
-          const authorText = line.split('|')[2];
-          authors = parseAuthors(authorText);
-        } else if (line.includes('| **Status** |')) {
-          const statusText = line.split('|')[2];
-          status = parseStatus(statusText);
-          discussion = parseDiscussionLink(statusText);
-        } else if (line.includes('| **Track** |')) {
-          track = line.split('|')[2].trim();
-        }
-      }
-
-      return {
-        number: acpNumber,
-        title,
-        authors,
-        status,
-        track,
-        content: markdown,
-        discussion
-      };
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error(`Error parsing ACP-${acpNumber}:`, err);
-      return null;
+      console.error('Failed to copy:', err);
     }
-  }
+  };
 
-  function parseAuthors(text: string) {
-    const authors = [];
-    const matches = text.match(/([^(@\n]+)(?:\s*\([@]([^)]+)\))?/g);
+const CodeBlock = ({ children, className, ...props }: any) => {
+  const match = /language-(\w+)/.exec(className || '');
+  const language = match ? match[1] : '';
+  const content = String(children).trim();
+  
+  // Initialize mermaid once
+  React.useEffect(() => {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      securityLevel: 'loose',
+      themeVariables: {
+        primaryColor: '#3b82f6',
+        primaryTextColor: '#ffffff',
+        primaryBorderColor: '#1e40af',
+        lineColor: '#6b7280',
+        secondaryColor: '#1f2937',
+        tertiaryColor: '#374151',
+        background: '#111827',
+        mainBkg: '#1f2937',
+        secondBkg: '#374151',
+      }
+    });
+  }, []);
 
-    if (matches) {
-      matches.forEach(match => {
-        const [_, name, github] = match.match(/([^(@\n]+)(?:\s*\([@]([^)]+)\))?/) || [];
-        if (name) {
-          authors.push({
-            name: name.trim(),
-            github: github?.trim() || name.trim()
-          });
+  // Check if this is a mermaid diagram
+  const isMermaid = language === 'mermaid' || 
+                   content.includes('flowchart') || 
+                   content.includes('graph') ||
+                   content.includes('sequenceDiagram') ||
+                   content.includes('classDiagram');
+
+  if (isMermaid) {
+    const chartId = `mermaid-chart-${Math.random().toString(36).substr(2, 9)}`;
+    
+    React.useEffect(() => {
+      const renderChart = async () => {
+        try {
+          const element = document.getElementById(chartId);
+          if (element) {
+            // Clear previous content
+            element.innerHTML = '';
+            
+            // Render the diagram
+            const { svg } = await mermaid.render(`${chartId}-svg`, content);
+            element.innerHTML = svg;
+          }
+        } catch (error) {
+          console.error('Mermaid rendering error:', error);
+          const element = document.getElementById(chartId);
+          if (element) {
+            element.innerHTML = `<div class="text-red-400 p-4">Error rendering diagram: ${error.message}</div>`;
+          }
         }
-      });
-    }
+      };
+      
+      if (document.getElementById(chartId)) {
+        renderChart();
+      }
+    }, [chartId, content]);
 
-    return authors;
+    return (
+      <div className="my-8 p-6 bg-gray-900 dark:bg-gray-800 rounded-lg overflow-auto">
+        <div id={chartId} className="flex justify-center min-h-[200px] items-center text-gray-400">
+          <div>Loading diagram...</div>
+        </div>
+      </div>
+    );
   }
 
-  function parseStatus(text: string): string {
-    const statusMatch = text.match(/\[([^\]]+)\]|\b(\w+)\b/);
-    return (statusMatch?.[1] || statusMatch?.[2] || 'Unknown').trim();
-  }
+  // Regular code blocks
+  return match ? (
+    <div className="my-6">
+      <SyntaxHighlighter
+        style={vscDarkPlus}
+        language={language}
+        PreTag="div"
+        className="rounded-lg"
+      >
+        {content}
+      </SyntaxHighlighter>
+    </div>
+  ) : (
+    <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm font-mono" {...props}>
+      {children}
+    </code>
+  );
+};
 
-  function parseDiscussionLink(text: string): string | undefined {
-    const match = text.match(/\[Discussion\]\(([^)]+)\)/);
-    return match ? match[1] : undefined;
-  }
+  const getCleanStatus = (status: string) => {
+    if (!status) return 'Unknown';
+    const match = status.match(/^[a-zA-Z]+/);
+    return match ? match[0] : 'Unknown';
+  };
 
-  function getStatusColor(status: string): string {
-    const statusLower = status.toLowerCase();
-    if (statusLower.includes('activated')) {
-      return 'text-green-500 dark:text-green-400';
+  const getStatusIcon = (status: string) => {
+      const cleanStatus = getCleanStatus(status); // Add this line
+      switch (cleanStatus?.toLowerCase()) {
+      case 'activated':
+      case 'final':
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case 'draft':
+      case 'review':
+        return <Clock className="w-5 h-5 text-yellow-500" />;
+      case 'stagnant':
+      case 'withdrawn':
+        return <XCircle className="w-5 h-5 text-red-500" />;
+      default:
+        return <AlertTriangle className="w-5 h-5 text-gray-500" />;
     }
-    if (statusLower.includes('draft') || statusLower.includes('proposed')) {
-      return 'text-yellow-500 dark:text-yellow-400';
-    }
-    if (statusLower.includes('rejected')) {
-      return 'text-red-500 dark:text-red-400';
-    }
-    return 'text-gray-500 dark:text-gray-400';
-  }
+  };
 
-  function getStatusIcon(status: string) {
-    const statusLower = status.toLowerCase();
-    if (statusLower.includes('activated')) {
-      return <CheckCircle className="w-4 h-4 text-green-500 dark:text-green-400" />;
+  const getStatusColor = (status: string) => {
+      const cleanStatus = getCleanStatus(status);
+    switch (cleanStatus?.toLowerCase()) {
+      case 'activated':
+      case 'final':
+        return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-500/20 dark:text-green-400 dark:border-green-500/30';
+      case 'draft':
+        return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30';
+      case 'review':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-400 dark:border-yellow-500/30';
+      case 'stagnant':
+      case 'withdrawn':
+        return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-500/20 dark:text-gray-400 dark:border-gray-500/30';
     }
-    if (statusLower.includes('draft') || statusLower.includes('proposed')) {
-      return <Clock className="w-4 h-4 text-yellow-500 dark:text-yellow-400" />;
-    }
-    if (statusLower.includes('rejected')) {
-      return <XCircle className="w-4 h-4 text-red-500 dark:text-red-400" />;
-    }
-    return <FileText className="w-4 h-4 text-gray-500 dark:text-gray-400" />;
-  }
+  };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex flex-col">
+        <StatusBar health={health} />
         <div className="flex-1 flex items-center justify-center">
-          <RefreshCw className="w-12 h-12 text-blue-500 animate-spin" />
+          <div className="text-center">
+            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Loading ACP-{acpNumber}...
+            </h2>
+            <p className="text-gray-600 dark:text-gray-300">
+              Fetching proposal details from local data.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -180,17 +262,32 @@ export function ACPDetails() {
   if (error || !acp) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex flex-col">
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="text-center">
-            <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">{error}</h2>
-            <button
-              onClick={() => navigate('/acps')}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to ACPs
-            </button>
+        <StatusBar health={health} />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <AlertTriangle className="w-8 h-8 mx-auto mb-4 text-red-600" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              ACP Not Found
+            </h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">
+              {error || `ACP-${acpNumber} could not be found.`}
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => navigate('/acps')}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to ACPs
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -199,73 +296,162 @@ export function ACPDetails() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 flex flex-col">
+      <StatusBar health={health} />
+
       <div className="flex-1">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex justify-between items-center mb-6">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
             <button
               onClick={() => navigate('/acps')}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="inline-flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to ACPs
             </button>
-            <ThemeToggle />
           </div>
 
-          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-md overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  ACP-{acp.number}
-                </span>
-                <div className="flex items-center gap-1">
-                  {getStatusIcon(acp.status)}
-                  <span className={`text-sm font-medium ${getStatusColor(acp.status)}`}>
-                    {acp.status}
+          {/* ACP Header */}
+          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-8 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl font-mono text-blue-600 dark:text-blue-400 font-bold">
+                    ACP-{acp.number}
                   </span>
+                  
                 </div>
-                <span className="text-sm font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-                  {acp.track}
-                </span>
-              </div>
 
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                {acp.title}
-              </h1>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                  <ReactMarkdown>{acp.title}</ReactMarkdown>
+                </h1>
 
-              <div className="flex flex-wrap gap-2 mb-6">
-                {acp.authors.map((author, index) => (
+                {/* Authors */}
+                <div className="flex items-center gap-2 mb-4">
+                  <Users className="w-5 h-5 text-gray-400" />
+                  <div className="flex flex-wrap gap-2">
+                    {acp.authors?.map((author, index) => (
+                      <a
+                        key={index}
+                        href={`https://github.com/${author.github}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      >
+                        {author.name}
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </a>
+                    )) || <span className="text-sm text-gray-600 dark:text-gray-400">Unknown</span>}
+                  </div>
+                </div>
+
+                
+
+                {/* Actions */}
+                <div className="flex gap-3 flex-wrap">
+                  {acp.discussion && (
+                    <a
+                      href={acp.discussion}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors"
+                    >
+                      <LinkIcon className="w-4 h-4 mr-2" />
+                      View Discussion
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                    </a>
+                  )}
+
                   <a
-                    key={index}
-                    href={`https://github.com/${author.github}`}
+                    href={`https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/${acp.folderName || acp.number}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors"
                   >
-                    {author.name}
-                    <ExternalLink className="ml-1 h-3 w-3" />
+                    <Github className="w-4 h-4 mr-2" />
+                    View on GitHub
+                    <ExternalLink className="w-3 h-3 ml-1" />
                   </a>
-                ))}
-              </div>
 
-              {acp.discussion && (
-                <div className="mb-6">
-                  <a
-                    href={acp.discussion}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700"
+                  <button
+                    onClick={copyToClipboard}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors"
                   >
-                    View Discussion
-                    <ExternalLink className="ml-2 -mr-1 h-4 w-4" />
-                  </a>
+                    {copied ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2 text-green-500" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy Link
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
+              </div>
+            </div>
+          </div>
 
-              <div 
-                className="prose dark:prose-invert max-w-none markdown-body bg-white dark:bg-dark-800"
-                dangerouslySetInnerHTML={{ __html: marked(acp.content) }}
-              />
+          {/* Content with ReactMarkdown */}
+          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 overflow-hidden">
+            <div className="prose prose-gray dark:prose-invert max-w-none break-words prose-table:table-auto prose-table:border-collapse prose-th:border prose-th:border-gray-300 prose-th:px-4 prose-th:py-2 prose-th:bg-gray-50 prose-td:border prose-td:border-gray-300 prose-td:px-4 prose-td:py-2">
+            <ReactMarkdown 
+  remarkPlugins={[remarkGfm, remarkMath]}
+  rehypePlugins={[rehypeKatex]}
+  components={{
+    code: CodeBlock,
+    // Handle custom note blocks
+    p: ({ children, ...props }) => {
+      const text = String(children);
+      
+      // Check if this paragraph starts with our note syntax
+      if (text.startsWith(':::note')) {
+        const noteContent = text.replace(/^:::note\s*/, '').replace(/:::$/, '');
+        return (
+          <div className="my-6 p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 rounded-r-lg">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-5 h-5 text-blue-500 mt-0.5">
+                <svg fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">Note</div>
+                <div className="text-sm text-blue-700 dark:text-blue-300">{noteContent}</div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      
+      if (text.startsWith(':::warning')) {
+        const warningContent = text.replace(/^:::warning\s*/, '').replace(/:::$/, '');
+        return (
+          <div className="my-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 rounded-r-lg">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-5 h-5 text-yellow-500 mt-0.5">
+                <svg fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-1">Warning</div>
+                <div className="text-sm text-yellow-700 dark:text-yellow-300">{warningContent}</div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      
+      // Regular paragraph
+      return <p {...props}>{children}</p>;
+    }
+  }}
+>
+  {preprocessContent(acp.content)}
+</ReactMarkdown>
             </div>
           </div>
         </div>
