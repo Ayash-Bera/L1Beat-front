@@ -91,6 +91,15 @@ export function BlogPost() {
     const [error, setError] = useState<string | null>(null);
     const [health] = useState<HealthStatus | null>(null);
     const [shareMenuOpen, setShareMenuOpen] = useState(false);
+    const XIcon = ({ className }: { className?: string }) => (
+    <svg 
+        viewBox="0 0 24 24" 
+        className={className}
+        fill="currentColor"
+    >
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+    </svg>
+    );
 
     useEffect(() => {
         if (!slug) {
@@ -121,24 +130,24 @@ export function BlogPost() {
     };
 
     const sharePost = (platform: 'twitter' | 'copy') => {
-        if (!post) return;
+    if (!post) return;
 
-        const url = window.location.href;
-        const text = `${post.title} - ${post.excerpt}`;
+    const url = window.location.href;
+    const text = `${post.title} - ${post.excerpt}`;
 
-        switch (platform) {
-            case 'twitter':
-                window.open(
-                    `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
-                    '_blank'
-                );
-                break;
-            case 'copy':
-                navigator.clipboard.writeText(url).then(() => {
-                    setShareMenuOpen(false);
-                });
-                break;
-        }
+    switch (platform) {
+        case 'twitter':
+            window.open(
+                `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+                '_blank'
+            );
+            break;
+        case 'copy':
+            navigator.clipboard.writeText(url).then(() => {
+                setShareMenuOpen(false);
+            });
+            break;
+    }
     };
 
     const renderMainContent = (content: string | undefined) => {
@@ -281,13 +290,15 @@ export function BlogPost() {
                         </div>
                         {/* Share Button */}
                         <div className="relative">
+                            <div className="flex justify-center gap-3">
                             <button
-                                onClick={() => setShareMenuOpen(!shareMenuOpen)}
-                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-900  border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                onClick={() => sharePost('twitter')}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                             >
-                                <Share2 className="w-4 h-4" />
-                                Share
+                                <XIcon className="w-4 h-4" />
+                                Share on X
                             </button>
+                        </div>
                             {/* Share Menu */}
                             {shareMenuOpen && (
                                 <div className="absolute right-0 top-full mt-2 w-48 bg-white  border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
@@ -342,7 +353,7 @@ export function BlogPost() {
                                 className="inline-flex items-center gap-1 font-medium hover:underline"
                             >
                                 View on Substack
-                                <ExternalLink className="w-3 h-3 mb" />
+                                <ExternalLink className="w-3 h-3 mb-3" />
                             </a>
                         </p>
                     </div>
