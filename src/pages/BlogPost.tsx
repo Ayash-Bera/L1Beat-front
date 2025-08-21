@@ -31,7 +31,7 @@ const NewsletterSubscription = () => {
     };
 
     return (
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-8 lg:p-12">
+        <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-8 lg:p-12">
             <div className="flex flex-col lg:flex-row lg:items-center gap-8 lg:gap-12">
                 {/* Left side - Text content - Fixed to prevent text wrapping */}
                 <div className="flex-1 text-center lg:text-left">
@@ -51,7 +51,7 @@ const NewsletterSubscription = () => {
                             name="email"
                             placeholder="Type your email..."
                             required
-                            className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-colors"
+                            className="flex-1 px-4 py-3 bg-gray-100  border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-colors"
                         />
                         <button 
                             type="submit"
@@ -115,11 +115,11 @@ const RelatedArticles = ({ currentPostSlug, limit = 4 }: { currentPostSlug: stri
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {Array.from({ length: limit }).map((_, i) => (
-                        <div key={i} className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                        <div key={i} className="rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                             <div className="animate-pulse">
-                                <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-3/4 mb-4"></div>
-                                <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded mb-2"></div>
-                                <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-1/2"></div>
+                                <div className="h-4 rounded w-3/4 mb-4"></div>
+                                <div className="h-3 rounded mb-2"></div>
+                                <div className="h-3 rounded w-1/2"></div>
                             </div>
                         </div>
                     ))}
@@ -152,7 +152,7 @@ const RelatedArticles = ({ currentPostSlug, limit = 4 }: { currentPostSlug: stri
                     <Link
                         key={post._id}
                         to={`/blog/${post.slug}`}
-                        className="group block bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-300 overflow-hidden hover:shadow-lg"
+                        className="group block rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-300 overflow-hidden hover:shadow-lg"
                     >
                         {post.imageUrl && (
                             <div className="relative h-40 overflow-hidden">
@@ -406,20 +406,18 @@ export function BlogPost() {
                                 </div>
                             )}
                         </div>
-
                         {/* Share Button */}
                         <div className="relative">
                             <button
                                 onClick={() => setShareMenuOpen(!shareMenuOpen)}
-                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white  border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                             >
                                 <Share2 className="w-4 h-4" />
                                 Share
                             </button>
-
                             {/* Share Menu */}
                             {shareMenuOpen && (
-                                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
+                                <div className="absolute right-0 top-full mt-2 w-48 bg-white  border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
                                     <button
                                         onClick={() => sharePost('twitter')}
                                         className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -439,7 +437,6 @@ export function BlogPost() {
                         </div>
                     </div>
                 </header>
-
                 {/* Featured Image */}
                 {post.imageUrl && (
                     <div className="relative mb-12 rounded-xl overflow-hidden">
@@ -450,9 +447,8 @@ export function BlogPost() {
                         />
                     </div>
                 )}
-
                 {/* Content */}
-                <div className="prose prose-lg max-w-none dark:prose-invert">
+                <div className="prose prose-lg max-w-none dark:prose-invert bg-transparent">
                     {post.mainContent ? (
                         renderMainContent(post.mainContent)
                     ) : post.content ? (
@@ -461,7 +457,6 @@ export function BlogPost() {
                         <p className="text-gray-500 dark:text-gray-400 italic">No content available.</p>
                     )}
                 </div>
-
                 {/* Original Source Link */}
                 {post.sourceUrl && (
                     <div className="mt-12 p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg">
