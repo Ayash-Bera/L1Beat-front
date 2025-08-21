@@ -17,6 +17,7 @@ import { BlogPost as BlogPostType, getBlogPost, formatBlogDate, calculateReadTim
 import { StatusBar } from '../components/StatusBar';
 import { Footer } from '../components/Footer';
 import { HealthStatus } from '../types';
+import { RelatedArticles } from '../components/RelatedArticles';
 
 // HELIUS-STYLE SUBSCRIPTION COMPONENT WITH BETTER TEXT SPACING
 // FIXED NEWSLETTER SUBSCRIPTION COMPONENT
@@ -76,134 +77,6 @@ const NewsletterSubscription = () => {
                         </a>
                     </p>
                 </div>
-            </div>
-        </div>
-    );
-};
-
-// Related Articles Component
-const RelatedArticles = ({ currentPostSlug, limit = 4 }: { currentPostSlug: string; limit?: number }) => {
-    const [relatedPosts, setRelatedPosts] = useState<RelatedPost[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        const fetchRelatedPosts = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-                const response = await getRelatedPosts(currentPostSlug, limit);
-                setRelatedPosts(response.data);
-            } catch (err) {
-                setError('Failed to load related articles');
-                console.error('Error fetching related posts:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (currentPostSlug) {
-            fetchRelatedPosts();
-        }
-    }, [currentPostSlug, limit]);
-
-    if (loading) {
-        return (
-            <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    Related Articles
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {Array.from({ length: limit }).map((_, i) => (
-                        <div key={i} className="rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-                            <div className="animate-pulse">
-                                <div className="h-4 rounded w-3/4 mb-4"></div>
-                                <div className="h-3 rounded mb-2"></div>
-                                <div className="h-3 rounded w-1/2"></div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    }
-
-    if (error || relatedPosts.length === 0) {
-        return null;
-    }
-
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    Related Articles
-                </h2>
-                <Link 
-                    to="/blog"
-                    className="inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-                >
-                    View all articles
-                    <ArrowLeft className="w-4 h-4 ml-1 transform rotate-180" />
-                </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {relatedPosts.map((post) => (
-                    <Link
-                        key={post._id}
-                        to={`/blog/${post.slug}`}
-                        className="group block rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-300 overflow-hidden hover:shadow-lg"
-                    >
-                        {post.imageUrl && (
-                            <div className="relative h-40 overflow-hidden">
-                                <img
-                                    src={post.imageUrl}
-                                    alt={post.title}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                />
-                            </div>
-                        )}
-
-                        <div className="p-4">
-                            {post.matchingTags && post.matchingTags.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mb-2">
-                                    {post.matchingTags.slice(0, 2).map((tag) => (
-                                        <span
-                                            key={tag}
-                                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 rounded-full"
-                                        >
-                                            <Tag className="w-2 h-2" />
-                                            {tag}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
-
-                            <h3 className="font-bold text-base text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mb-2 line-clamp-2">
-                                {post.title}
-                            </h3>
-
-                            <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1">
-                                        <Calendar className="w-3 h-3" />
-                                        <span>{formatBlogDate(post.publishedAt)}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Clock className="w-3 h-3" />
-                                        <span>{post.readTime} min</span>
-                                    </div>
-                                </div>
-
-                                {post.matchingTagsCount > 0 && (
-                                    <div className="text-blue-600 dark:text-blue-400 font-medium text-xs">
-                                        {post.matchingTagsCount} shared
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </Link>
-                ))}
             </div>
         </div>
     );
@@ -469,42 +342,38 @@ export function BlogPost() {
                                 className="inline-flex items-center gap-1 font-medium hover:underline"
                             >
                                 View on Substack
-                                <ExternalLink className="w-3 h-3" />
+                                <ExternalLink className="w-3 h-3 mb" />
                             </a>
                         </p>
                     </div>
                 )}
             </article>
 
+        {/* Newsletter and Related Articles Section - Combined container */}
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-6">
             {/* Divider */}
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="border-t border-gray-200 dark:border-gray-700"></div>
-            </div>
-
+            <div className="border-t border-gray-200 dark:border-gray-700 mb-5"></div>
+            
             {/* Newsletter Subscription */}
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="mb-9">
                 <NewsletterSubscription />
             </div>
-
-            {/* Divider */}
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="border-t border-gray-200 dark:border-gray-700"></div>
-            </div>
-
+            
             {/* Related Articles */}
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="mb-6">
                 <RelatedArticles currentPostSlug={post.slug} limit={3} />
             </div>
+        </div>
 
-            {/* Close on outside click */}
-            {shareMenuOpen && (
-                <div 
-                    className="fixed inset-0 z-5" 
-                    onClick={() => setShareMenuOpen(false)}
-                />
-            )}
-
-            <Footer />
+        {/* Close on outside click */}
+        {shareMenuOpen && (
+            <div 
+                className="fixed inset-0 z-5" 
+                onClick={() => setShareMenuOpen(false)}
+            />
+        )}
+        
+        <Footer />
         </div>
     );
 }
