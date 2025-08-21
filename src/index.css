@@ -432,14 +432,15 @@
   }
 }
 
-/* Force white text in Sankey diagram for both themes */
-.node-label {
-  fill: #ffffff !important;
+
+/* Optional: Add these responsive mermaid styles instead */
+.mermaid-container {
+  transition: background-color 0.2s ease-in-out;
 }
 
-.value-label,
-.diagram-title {
-  fill: rgba(255, 255, 255, 0.7) !important;
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
 }
 
 .prose-content,
