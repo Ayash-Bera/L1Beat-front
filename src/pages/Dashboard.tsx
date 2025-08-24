@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { getChains, getHealth } from '../api';
 import { Chain, HealthStatus } from '../types';
 import { ChainCard } from '../components/ChainCard';
+import { ChainListView } from '../components/ChainListView';
 import { StatusBar } from '../components/StatusBar';
 import { TVLChart } from '../components/TVLChart';
 import { L1MetricsChart } from '../components/L1MetricsChart';
 import { TeleporterSankeyDiagram } from '../components/TeleporterSankeyDiagram';
 import { NetworkTopologyGraph } from '../components/NetworkTopologyGraph';
 import { Footer } from '../components/Footer';
-import { LayoutGrid, Activity, Network, Search } from 'lucide-react';
+import { LayoutGrid, Activity, Network, Search, Grid, List } from 'lucide-react';
 import { TeleporterDailyChart } from '../components/TeleporterDailyChart';
 
 export function Dashboard() {
@@ -18,6 +19,7 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   async function fetchData() {
     try {
@@ -149,17 +151,52 @@ export function Dashboard() {
               </h2>
             </div>
 
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
+            <div className="flex items-center gap-3">
+              <div className="flex items-center bg-gray-100 dark:bg-dark-700 rounded-lg p-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setViewMode('grid');
+                  }}
+                  className={`p-2 rounded transition-all duration-200 hover:scale-105 ${
+                    viewMode === 'grid'
+                      ? 'bg-white dark:bg-dark-600 shadow-sm text-blue-600 dark:text-blue-400'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-dark-600'
+                  }`}
+                  title="Grid view"
+                >
+                  <Grid className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setViewMode('list');
+                  }}
+                  className={`p-2 rounded transition-all duration-200 hover:scale-105 ${
+                    viewMode === 'list'
+                      ? 'bg-white dark:bg-dark-600 shadow-sm text-blue-600 dark:text-blue-400'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-dark-600'
+                  }`}
+                  title="List view"
+                >
+                  <List className="w-4 h-4" />
+                </button>
               </div>
-              <input
-                type="text"
-                placeholder="Search chains by name or ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-dark-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
+              
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search chains by name or ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-dark-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
             </div>
           </div>
 
@@ -170,10 +207,25 @@ export function Dashboard() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredChains.map(chain => (
-                <ChainCard key={chain.chainId} chain={chain} />
-              ))}
+            <div key={viewMode} className="animate-fade-in">
+              {viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredChains.map((chain, index) => (
+                    <div 
+                      key={chain.chainId}
+                      className="animate-fade-in"
+                      style={{
+                        animationDelay: `${index * 50}ms`,
+                        animationFillMode: 'both'
+                      }}
+                    >
+                      <ChainCard chain={chain} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <ChainListView chains={filteredChains} />
+              )}
             </div>
           )}
         </div>
