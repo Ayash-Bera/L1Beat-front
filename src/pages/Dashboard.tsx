@@ -152,38 +152,30 @@ export function Dashboard() {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="flex items-center bg-gray-100 dark:bg-dark-700 rounded-lg p-1">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setViewMode('grid');
-                  }}
-                  className={`p-2 rounded transition-all duration-200 hover:scale-105 ${
-                    viewMode === 'grid'
-                      ? 'bg-white dark:bg-dark-600 shadow-sm text-blue-600 dark:text-blue-400'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-dark-600'
-                  }`}
-                  title="Grid view"
-                >
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setViewMode(viewMode === 'grid' ? 'list' : 'grid');
+                }}
+                className="flex items-center bg-gray-100 dark:bg-dark-700 rounded-lg p-1 hover:bg-gray-200 dark:hover:bg-dark-600 transition-all duration-200"
+                title={`Switch to ${viewMode === 'grid' ? 'list' : 'grid'} view`}
+              >
+                <div className={`p-2 rounded transition-all duration-200 ${
+                  viewMode === 'grid'
+                    ? 'bg-white dark:bg-dark-600 shadow-sm text-blue-600 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-400'
+                }`}>
                   <Grid className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setViewMode('list');
-                  }}
-                  className={`p-2 rounded transition-all duration-200 hover:scale-105 ${
-                    viewMode === 'list'
-                      ? 'bg-white dark:bg-dark-600 shadow-sm text-blue-600 dark:text-blue-400'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-dark-600'
-                  }`}
-                  title="List view"
-                >
+                </div>
+                <div className={`p-2 rounded transition-all duration-200 ${
+                  viewMode === 'list'
+                    ? 'bg-white dark:bg-dark-600 shadow-sm text-blue-600 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-400'
+                }`}>
                   <List className="w-4 h-4" />
-                </button>
-              </div>
+                </div>
+              </button>
               
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

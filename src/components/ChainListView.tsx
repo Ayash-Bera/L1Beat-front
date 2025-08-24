@@ -52,19 +52,19 @@ export function ChainListView({ chains }: ChainListViewProps) {
               )}
               
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                   {chain.chainName}
                 </h3>
                 <div className="flex items-center gap-4 mt-1">
                   <div className="flex items-center gap-1">
-                    <Activity className={`w-3 h-3 ${tpsColor} ${tpsValue !== 'N/A' && Number(tpsValue) > 0 ? 'animate-pulse' : ''}`} />
-                    <span className={`text-xs font-medium ${tpsColor} group-hover:font-bold transition-all duration-300`}>
+                    <Activity className={`w-3 h-3 ${tpsColor}`} />
+                    <span className={`text-xs font-medium ${tpsColor}`}>
                       {tpsValue} TPS
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Server className="w-3 h-3 text-blue-500 dark:text-blue-400 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors duration-300" />
-                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400 group-hover:font-bold group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-all duration-300">
+                    <Server className="w-3 h-3 text-blue-500 dark:text-blue-400" />
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
                       {chain.validators?.length || 0}
                     </span>
                   </div>
