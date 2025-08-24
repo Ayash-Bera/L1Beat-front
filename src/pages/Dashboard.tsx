@@ -158,20 +158,30 @@ export function Dashboard() {
                   e.preventDefault();
                   setViewMode(viewMode === 'grid' ? 'list' : 'grid');
                 }}
-                className="flex items-center bg-gray-100 dark:bg-dark-700 rounded-lg p-1 hover:bg-gray-200 dark:hover:bg-dark-600 transition-all duration-200"
+                className="relative flex items-center bg-gray-100 dark:bg-dark-700 rounded-lg p-1 transition-all duration-200 overflow-hidden group"
                 title={`Switch to ${viewMode === 'grid' ? 'list' : 'grid'} view`}
               >
-                <div className={`p-2 rounded transition-all duration-200 ${
+                {/* Sliding background indicator */}
+                <div 
+                  className={`absolute top-1 bottom-1 w-8 bg-white dark:bg-dark-600 rounded shadow-sm transition-all duration-300 ease-out ${
+                    viewMode === 'grid' ? 'left-1' : 'left-9'
+                  }`}
+                />
+                
+                {/* Grid icon */}
+                <div className={`relative z-10 p-2 rounded transition-all duration-200 ${
                   viewMode === 'grid'
-                    ? 'bg-white dark:bg-dark-600 shadow-sm text-blue-600 dark:text-blue-400'
-                    : 'text-gray-600 dark:text-gray-400'
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300'
                 }`}>
                   <Grid className="w-4 h-4" />
                 </div>
-                <div className={`p-2 rounded transition-all duration-200 ${
+                
+                {/* List icon */}
+                <div className={`relative z-10 p-2 rounded transition-all duration-200 ${
                   viewMode === 'list'
-                    ? 'bg-white dark:bg-dark-600 shadow-sm text-blue-600 dark:text-blue-400'
-                    : 'text-gray-600 dark:text-gray-400'
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-gray-600 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300'
                 }`}>
                   <List className="w-4 h-4" />
                 </div>
